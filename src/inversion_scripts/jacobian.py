@@ -17,7 +17,7 @@ from utils import save_obj, filter_tropomi
 def read_tropomi(filename):
     """
     Read TROPOMI data and save important variables to dictionary.
-
+    This has been re-written by SB to be compatible w/v14 and newer TROPOMI
     Arguments
         filename [str]  : TROPOMI netcdf data file to read
 
@@ -42,86 +42,179 @@ def read_tropomi(filename):
 
     # Initialize dictionary for TROPOMI data
     dat = {}
-
+    
     # Store methane, QA, lat, lon
     try:   
-        tropomi_data = xr.open_dataset(filename, group="PRODUCT")
+        tropomi_data = xr.open_dataset(filename, group="target_product")
     except Exception as e:
         print(f"Error opening {filename}: {e}")
         return None
+    
+    #v14_14 onwards has max int32 values in NaN for dates
+    #need to filter these out first using a temp dictionary
+    #must use different group-name conventions
+    #data dimensions are only nobs and not along/across orbit -SB
+    temp = {}
 
-    dat["methane"] = tropomi_data["methane_mixing_ratio_bias_corrected"].values[0, :, :]
-    dat["qa_value"] = tropomi_data["qa_value"].values[0, :, :]
-    dat["longitude"] = tropomi_data["longitude"].values[0, :, :]
-    dat["latitude"] = tropomi_data["latitude"].values[0, :, :]
-
-    # Store UTC time
-    reference_time = tropomi_data["time"].values
-    delta_time = tropomi_data["delta_time"][0].values
-    strdate = []
-    if delta_time.dtype == "<m8[ns]":
-        strdate = reference_time + delta_time
-    elif delta_time.dtype == "<M8[ns]":
-        strdate = delta_time
-    else:
-        print(delta_time.dtype)
-        pass
-    dat["utctime"] = strdate
-
-    # Store time for whole orbit
-    times = np.zeros(shape=dat["longitude"].shape, dtype="datetime64[ns]")
-    for k in range(dat["longitude"].shape[0]):
-        times[k, :] = strdate[k]
-    dat["time"] = times
+    temp['methane'] = xr.DataArray(tropomi_data["xch4_corrected"])
+    temp['column_AK'] = xr.DataArray(tropomi_data["xch4_column_averaging_kernel"])
+    temp['methane_profile_apriori'] = xr.DataArray(tropomi_data["ch4_profile_apriori"])
+    tropomi_data.close()
+    
+    tropomi_data = xr.open_dataset(filename, group="diagnostics")
+    temp['qa_value'] = xr.DataArray(tropomi_data["qa_value"])
+    tropomi_data.close()
+    
+    tropomi_data = xr.open_dataset(filename, group="meteo")
+    temp['dry_air_subcolumns'] = xr.DataArray(tropomi_data["dry_air_subcolumns"])
+    temp['surface_pressure'] = xr.DataArray(tropomi_data["surface_pressure"])
+    temp['pressure_interval'] = xr.DataArray(tropomi_data["dp"])
+    tropomi_data.close()
+    
+    tropomi_data = xr.open_dataset(filename, group="side_product")
+    temp['albedo'] = xr.DataArray(tropomi_data["surface_albedo"])
+    tropomi_data.close()
+    
+    tropomi_data = xr.open_dataset(filename, group="instrument")
+    temp['latitude'] = xr.DataArray(tropomi_data["latitude_center"])
+    temp['latitude_bounds'] = xr.DataArray(tropomi_data["latitude_corners"])
+    temp['longitude'] = xr.DataArray(tropomi_data["longitude_center"])
+    temp['longitude_bounds'] = xr.DataArray(tropomi_data["longitude_corners"])
+    temp['rawtime']= xr.DataArray(tropomi_data["time"])
     tropomi_data.close()
 
-    # Store column averaging kernel, SWIR and NIR surface albedo
-    tropomi_data = xr.open_dataset(
-        filename, group="PRODUCT/SUPPORT_DATA/DETAILED_RESULTS"
-    )
-    dat["column_AK"] = tropomi_data["column_averaging_kernel"].values[0, :, :, ::-1]
-    dat["swir_albedo"] = tropomi_data["surface_albedo_SWIR"].values[0, :, :]
-    dat["nir_albedo"] = tropomi_data["surface_albedo_NIR"].values[0, :, :]
+    temp['methane'] = temp['methane'].where(temp['latitude']<1000,drop=True)
+    temp['column_AK'] = temp['column_AK'].where(temp['latitude']<1000,drop=True)
+    temp['methane_profile_apriori'] = temp['methane_profile_apriori'].where(temp['latitude']<1000,drop=True)
+    temp['qa_value'] = temp['qa_value'].where(temp['latitude']<1000,drop=True)
+    temp['dry_air_subcolumns'] = temp['dry_air_subcolumns'].where(temp['latitude']<1000,drop=True)
+    temp['surface_pressure'] = temp['surface_pressure'].where(temp['latitude']<1000,drop=True)
+    temp['pressure_interval'] = temp['pressure_interval'].where(temp['latitude']<1000,drop=True)
+    temp['albedo'] = temp['albedo'].where(temp['latitude']<1000,drop=True)
+    temp['longitude'] = temp['longitude'].where(temp['latitude']<1000,drop=True)
+    temp['longitude_bounds'] = temp['longitude_bounds'].where(temp['latitude']<1000,drop=True)
+    temp['rawtime'] = temp['rawtime'].where(temp['latitude']<1000,drop=True)
+    temp['latitude_bounds'] = temp['latitude_bounds'].where(temp['latitude']<1000,drop=True)
+    temp['latitude'] = temp['latitude'].where(temp['latitude']<1000,drop=True)
+    
+    #convert array to np.datetime format
+    newtime={}
+    newtime["year"] = temp['rawtime'].values[:,0]
+    newtime["month"] = temp['rawtime'].values[:,1]
+    newtime["day"] = temp['rawtime'].values[:,2]
+    newtime["hour"] = temp['rawtime'].values[:,3]
+    newtime["minute"] = temp['rawtime'].values[:,4]
+    newtime["second"] = temp['rawtime'].values[:,5]
+    newtime["ms"] = temp['rawtime'].values[:,6]
+    temp['utctime'] = pd.to_datetime(newtime)
+    del newtime
+
+    #orient back to original dictionary
+    dat["methane"] = temp["methane"].values
+    dat["qa_value"] = temp["qa_value"].values
+    dat["longitude"] = temp["longitude"].values
+    dat["latitude"] = temp["latitude"].values
+    dat["longitude_bounds"] = temp["longitude_bounds"].values
+    dat["latitude_bounds"] = temp["latitude_bounds"].values    
+    dat['time'] = temp['utctime'].values
+    dat['utctime'] = temp['utctime'].values #repeated for compatibility   
+ 
+    dat["nir_albedo"] = temp["albedo"].values[:,0]
+    dat["swir_albedo"] = temp["albedo"].values[:,1]
     dat["blended_albedo"] = 2.4 * dat["nir_albedo"] - 1.13 * dat["swir_albedo"]
-    tropomi_data.close()
 
-    # Store methane prior profile, dry air subcolumns
-    tropomi_data = xr.open_dataset(filename, group="PRODUCT/SUPPORT_DATA/INPUT_DATA")
-    dat["methane_profile_apriori"] = tropomi_data["methane_profile_apriori"].values[
-        0, :, :, ::-1
-    ]  # mol m-2
-    dat["dry_air_subcolumns"] = tropomi_data["dry_air_subcolumns"].values[
-        0, :, :, ::-1
-    ]  # mol m-2
+    dat["column_AK"] = temp["column_AK"].values[:,::-1]
+    
+    np.seterr(all='ignore') #suppress this message caused by NaN defaulted to max
+    dat["methane_profile_apriori"] = temp["methane_profile_apriori"].values[:,::-1] * 10000 #mol cm-2 to mol m-2
+    dat["dry_air_subcolumns"] = temp["dry_air_subcolumns"].values[:,::-1] * 10000 #mol cm-2 to mol m-2
+    np.seterr(all='warn')    
 
-    # Also get pressure interval and surface pressure for use below
-    pressure_interval = (
-        tropomi_data["pressure_interval"].values[0, :, :] / 100
-    )  # Pa -> hPa
-    surface_pressure = (
-        tropomi_data["surface_pressure"].values[0, :, :] / 100
-    )  # Pa -> hPa
-    tropomi_data.close()
-
-    # Store latitude and longitude bounds for pixels
-    tropomi_data = xr.open_dataset(filename, group="PRODUCT/SUPPORT_DATA/GEOLOCATIONS")
-    dat["longitude_bounds"] = tropomi_data["longitude_bounds"].values[0, :, :, :]
-    dat["latitude_bounds"] = tropomi_data["latitude_bounds"].values[0, :, :, :]
-    tropomi_data.close()
-
-    # Store vertical pressure profile
-    n1 = dat["methane"].shape[
-        0
-    ]  # length of along-track dimension (scanline) of retrieval field
-    n2 = dat["methane"].shape[
-        1
-    ]  # length of across-track dimension (ground_pixel) of retrieval field
-    pressures = np.zeros([n1, n2, 12 + 1], dtype=np.float32)
+    pressure_interval = temp["pressure_interval"].values #hPa
+    surface_pressure = temp["surface_pressure"].values #hPa
+    
+    # Data is arranged as a single vector in these files
+    pressures = np.zeros([dat["methane"].shape[0], 12 + 1], dtype=np.float32)
     pressures.fill(np.nan)
     for i in range(12 + 1):
-        pressures[:, :, i] = surface_pressure - i * pressure_interval
+        pressures[:, i] = surface_pressure - i * pressure_interval
     dat["pressures"] = pressures
+    
+    #cleanup
+    del temp
+    
+    #dat["methane"] = tropomi_data["methane_mixing_ratio_bias_corrected"].values[0, :, :]
+    #dat["qa_value"] = tropomi_data["qa_value"].values[0, :, :]
+    #dat["longitude"] = tropomi_data["longitude"].values[0, :, :]
+    #dat["latitude"] = tropomi_data["latitude"].values[0, :, :]
 
+    # Store UTC time
+    #reference_time = tropomi_data["time"].values
+    #delta_time = tropomi_data["delta_time"][0].values
+    #strdate = []
+    #if delta_time.dtype == "<m8[ns]":
+    #    strdate = reference_time + delta_time
+    #elif delta_time.dtype == "<M8[ns]":
+    #    strdate = delta_time
+    #else:
+    #    print(delta_time.dtype)
+    #    pass
+    #dat["utctime"] = strdate
+
+    # Store time for whole orbit
+    #times = np.zeros(shape=dat["longitude"].shape, dtype="datetime64[ns]")
+    #for k in range(dat["longitude"].shape[0]):
+    #    times[k, :] = strdate[k]
+    #dat["time"] = times
+    #tropomi_data.close()
+
+    # Store column averaging kernel, SWIR and NIR surface albedo
+    #tropomi_data = xr.open_dataset(
+    #    filename, group="PRODUCT/SUPPORT_DATA/DETAILED_RESULTS"
+    #)
+    #dat["column_AK"] = tropomi_data["column_averaging_kernel"].values[0, :, :, ::-1]
+    #dat["swir_albedo"] = tropomi_data["surface_albedo_SWIR"].values[0, :, :]
+    #dat["nir_albedo"] = tropomi_data["surface_albedo_NIR"].values[0, :, :]
+    #dat["blended_albedo"] = 2.4 * dat["nir_albedo"] - 1.13 * dat["swir_albedo"]
+    #tropomi_data.close()
+
+    # Store methane prior profile, dry air subcolumns
+    #tropomi_data = xr.open_dataset(filename, group="PRODUCT/SUPPORT_DATA/INPUT_DATA")
+    #dat["methane_profile_apriori"] = tropomi_data["methane_profile_apriori"].values[
+    #    0, :, :, ::-1
+    #]  # mol m-2
+    #dat["dry_air_subcolumns"] = tropomi_data["dry_air_subcolumns"].values[
+    #    0, :, :, ::-1
+    #]  # mol m-2
+
+    # Also get pressure interval and surface pressure for use below
+    #pressure_interval = (
+    #    tropomi_data["pressure_interval"].values[0, :, :] / 100
+    #)  # Pa -> hPa
+    #surface_pressure = (
+    #    tropomi_data["surface_pressure"].values[0, :, :] / 100
+    #)  # Pa -> hPa
+    #tropomi_data.close()
+
+    # Store latitude and longitude bounds for pixels
+    #tropomi_data = xr.open_dataset(filename, group="PRODUCT/SUPPORT_DATA/GEOLOCATIONS")
+    #dat["longitude_bounds"] = tropomi_data["longitude_bounds"].values[0, :, :, :]
+    #dat["latitude_bounds"] = tropomi_data["latitude_bounds"].values[0, :, :, :]
+    #tropomi_data.close()
+
+    # Store vertical pressure profile
+    #n1 = dat["methane"].shape[
+    #    0
+    #]  # length of along-track dimension (scanline) of retrieval field
+    #n2 = dat["methane"].shape[
+    #    1
+    #]  # length of across-track dimension (ground_pixel) of retrieval field
+    #pressures = np.zeros([n1, n2, 12 + 1], dtype=np.float32)
+    #pressures.fill(np.nan)
+    #for i in range(12 + 1):
+    #    pressures[:, :, i] = surface_pressure - i * pressure_interval
+    #dat["pressures"] = pressures
+    
     return dat
 
 
@@ -434,9 +527,10 @@ def apply_tropomi_operator(
     # For each TROPOMI observation
     for k in range(n_obs):
         # Get the date and hour
-        iSat = sat_ind[0][k]  # lat index
-        jSat = sat_ind[1][k]  # lon index
-        time = pd.to_datetime(str(TROPOMI["utctime"][iSat]))
+        #iSat = sat_ind[0][k]  # lat index
+        #jSat = sat_ind[1][k]  # lon index
+        indSat = sat_ind[0][k] # use obs index instead
+        time = pd.to_datetime(str(TROPOMI["utctime"][indSat]))
         strdate = time.round("60min").strftime("%Y%m%d_%H")
         all_strdate.append(strdate)
     all_strdate = list(set(all_strdate))
@@ -452,19 +546,20 @@ def apply_tropomi_operator(
     for k in range(n_obs):
 
         # Get GEOS-Chem data for the date of the observation:
-        iSat = sat_ind[0][k]
-        jSat = sat_ind[1][k]
-        p_sat = TROPOMI["pressures"][iSat, jSat, :]
-        dry_air_subcolumns = TROPOMI["dry_air_subcolumns"][iSat, jSat, :]  # mol m-2
-        apriori = TROPOMI["methane_profile_apriori"][iSat, jSat, :]  # mol m-2
-        avkern = TROPOMI["column_AK"][iSat, jSat, :]
-        time = pd.to_datetime(str(TROPOMI["utctime"][iSat]))
+        #iSat = sat_ind[0][k]
+        #jSat = sat_ind[1][k]
+        indSat = sat_ind[0][k]
+        p_sat = TROPOMI["pressures"][indSat, :]
+        dry_air_subcolumns = TROPOMI["dry_air_subcolumns"][indSat, :]  # mol m-2
+        apriori = TROPOMI["methane_profile_apriori"][indSat, :]  # mol m-2
+        avkern = TROPOMI["column_AK"][indSat, :]
+        time = pd.to_datetime(str(TROPOMI["utctime"][indSat]))
         strdate = time.round("60min").strftime("%Y%m%d_%H")
         GEOSCHEM = all_date_gc[strdate]
 
         # Find GEOS-Chem lats & lons closest to the corners of the TROPOMI pixel
-        longitude_bounds = TROPOMI["longitude_bounds"][iSat, jSat, :]
-        latitude_bounds = TROPOMI["latitude_bounds"][iSat, jSat, :]
+        longitude_bounds = TROPOMI["longitude_bounds"][indSat, :]
+        latitude_bounds = TROPOMI["latitude_bounds"][indSat, :]
         corners_lon_index = []
         corners_lat_index = []
         for l in range(4):
@@ -602,14 +697,13 @@ def apply_tropomi_operator(
         virtual_tropomi = area_weighted_virtual_tropomi / sum(overlap_area)
 
         # Save actual and virtual TROPOMI data
-        obs_GC[k, 0] = TROPOMI["methane"][
-            iSat, jSat
-        ]  # Actual TROPOMI methane column observation
+        obs_GC[k, 0] = TROPOMI["methane"][indSat]
+        # Actual TROPOMI methane column observation
         obs_GC[k, 1] = virtual_tropomi  # Virtual TROPOMI methane column observation
-        obs_GC[k, 2] = TROPOMI["longitude"][iSat, jSat]  # TROPOMI longitude
-        obs_GC[k, 3] = TROPOMI["latitude"][iSat, jSat]  # TROPOMI latitude
-        obs_GC[k, 4] = iSat  # TROPOMI index of longitude
-        obs_GC[k, 5] = jSat  # TROPOMI index of latitude
+        obs_GC[k, 2] = TROPOMI["longitude"][indSat]  # TROPOMI longitude
+        obs_GC[k, 3] = TROPOMI["latitude"][indSat]  # TROPOMI latitude
+        obs_GC[k, 4] = indSat  # TROPOMI index of longitude - changed to indSat
+        obs_GC[k, 5] = indSat  # TROPOMI index of latitude - repeated in case of compatibility
 
         if build_jacobian:
             # Compute TROPOMI sensitivity as weighted mean by overlapping area
@@ -676,7 +770,7 @@ if __name__ == "__main__":
         filename = allfiles[index]
         shortname = re.split("\/", filename)[-1]
         shortname = re.split("\.", shortname)[0]
-        strdate = re.split("\.|_+|T", shortname)[4]
+        strdate = re.split("\.|_+|T", shortname)[5]
         strdate = datetime.datetime.strptime(strdate, "%Y%m%d")
         if (strdate >= gc_startdate) and (strdate <= gc_enddate):
             sat_files.append(filename)

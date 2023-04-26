@@ -1,16 +1,22 @@
 #!/bin/bash
 
+#PBS -l select=1:ncpus=4:mem=8gb
+
 #SBATCH -J {RunName}
 #SBATCH -c 8
 #SBATCH -N 1
 #SBATCH --mem 6000
 #SBATCH -t 0-6:00
 
+
+### Move to directory where command was issued
+cd $PBS_O_WORKDIR || exit $?
+
 ### Run directory
 RUNDIR=$(pwd -P)
 
 ### Get current task ID
-x=${SLURM_ARRAY_TASK_ID}
+x=${PBS_ARRAY_INDEX}
 
 ### Add zeros to the cluster Id
 if [ $x -lt 10 ]; then

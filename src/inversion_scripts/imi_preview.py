@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
+#!/home/rsb001/.conda/envs/geo/bin/python
 # -*- coding: utf-8 -*-
 
-#SBATCH -N 1
-#SBATCH -n 1
+#PBS -l select=1:ncpus=32:mem=128gb
 
 import numpy as np
 import xarray as xr
@@ -65,17 +64,18 @@ def get_TROPOMI_data(file_path, xlim, ylim, startdate_np64, enddate_np64):
     # Loop over observations and archive
     num_obs = len(sat_ind[0])
     for k in range(num_obs):
-        lat_idx = sat_ind[0][k]
-        lon_idx = sat_ind[1][k]
-        tropomi_data["lat"].append(TROPOMI["latitude"][lat_idx, lon_idx])
-        tropomi_data["lon"].append(TROPOMI["longitude"][lat_idx, lon_idx])
-        tropomi_data["xch4"].append(TROPOMI["methane"][lat_idx, lon_idx])
-        tropomi_data["swir_albedo"].append(TROPOMI["swir_albedo"][lat_idx, lon_idx])
+        #lat_idx = sat_ind[0][k]
+        #lon_idx = sat_ind[1][k]
+        obs_idx = sat_ind[0][k]
+        tropomi_data["lat"].append(TROPOMI["latitude"][obs_idx])
+        tropomi_data["lon"].append(TROPOMI["longitude"][obs_idx])
+        tropomi_data["xch4"].append(TROPOMI["methane"][obs_idx])
+        tropomi_data["swir_albedo"].append(TROPOMI["swir_albedo"][obs_idx])
 
     return tropomi_data
 
 
-def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
+def imi_preview(inversion_path, config_path, state_vector_path, preview_dir, tropomi_cache):
     """
     Function to perform preview
     Requires preview simulation to have been run already (to generate HEMCO diags)
@@ -89,12 +89,11 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     # Read config file
     config = yaml.load(open(config_path), Loader=yaml.FullLoader)
     # redirect output to log file
-    if config["isAWS"]:
-        output_file = open(
-            "/home/ubuntu/integrated_methane_inversion/imi_output.log", "a"
-        )
-        sys.stdout = output_file
-        sys.stderr = output_file
+    output_file = open(
+        f"{inversion_path}/imi_output.log", "a"
+    )
+    sys.stdout = output_file
+    sys.stderr = output_file
     # Open the state vector file
     state_vector = xr.load_dataset(state_vector_path)
     state_vector_labels = state_vector["StateVector"]
@@ -296,6 +295,7 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
     df_means["lon"] = np.round(df_means["lon"], 1)
     df_means = df_means.groupby(["lat", "lon"]).mean()
     ds = df_means.to_xarray()
+    ds.to_netcdf(os.path.join(preview_dir, "ds_01x01.nc"))
 
     # Prepare plot data for observation counts
     df_counts = df.copy(deep=True).drop(["xch4", "swir_albedo"], axis=1)
@@ -387,10 +387,11 @@ def imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache):
 
 if __name__ == "__main__":
     import sys
+    
+    inversion_path = sys.argv[1]
+    config_path = sys.argv[2]
+    state_vector_path = sys.argv[3]
+    preview_dir = sys.argv[4]
+    tropomi_cache = sys.argv[5]
 
-    config_path = sys.argv[1]
-    state_vector_path = sys.argv[2]
-    preview_dir = sys.argv[3]
-    tropomi_cache = sys.argv[4]
-
-    imi_preview(config_path, state_vector_path, preview_dir, tropomi_cache)
+    imi_preview(inversion_path, config_path, state_vector_path, preview_dir, tropomi_cache)

@@ -1,13 +1,15 @@
 #!/bin/bash
 
-#SBATCH -n 1
-#SBATCH -N 1
-#SBATCH -t 0-03:00
-#SBATCH --mem 4000
-#SBATCH -o run_inversion_%j.out
-#SBATCH -e run_inversion_%j.err
+#PBS -l select=1:ncpus=80:mem=185gb
+#PBS -N imi_run_inversion
+#PBS -l walltime=6:0:0
 
-##=======================================================================
+# initialize for eccc
+cd ${PBS_O_WORKDIR}
+source ~/.startconda
+source activate geo
+
+#=======================================================================
 ## Parse config.yml file
 ##=======================================================================
 

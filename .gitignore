@@ -1,8 +1,11 @@
 GEOS-Chem
 GCClassic
 docs/build/
+configs
+logs
 .DS_STORE
 src/inversion_scripts/__pycache__
 src/notebooks/.ipynb_checkpoints
 slurm-*.out
+*.log
 *~

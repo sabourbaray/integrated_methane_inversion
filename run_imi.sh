@@ -98,7 +98,11 @@ if "$isAWS"; then
     printf "\nFinished TROPOMI download\n"
 else
     # use existing tropomi data and create a symlink to it
-    ln -s $DataPathTROPOMI $tropomiCache
+    # add line to TROPOMI path based on chosen retrieval (lorente, bremen, etc.) -SB
+    export DataPathTROPOMI="/home/rsb001/sitestore/data/tropomi/19_446"
+    if [[ ! -L $tropomiCache ]] ; then
+	ln -s $DataPathTROPOMI $tropomiCache
+    fi
 fi
 
 ##=======================================================================
@@ -118,8 +122,8 @@ if "$RunSetup"; then
 			exit 1
 		else
 	        # Load environment with modules for compiling GEOS-Chem Classic
-    	    source ${GEOSChemEnv}
-    	fi
+    	        source ${GEOSChemEnv} | grep silenceoutput
+    	        fi
     fi
 
     # Run the setup script
@@ -144,11 +148,11 @@ if  "$DoSpinup"; then
 
     if ! "$isAWS"; then
         # Load environment with modules for compiling GEOS-Chem Classic
-        source ${GEOSChemEnv}
+        source ${GEOSChemEnv} | grep silenceoutput
     fi
 
     # Submit job to job scheduler
-    sbatch -W ${RunName}_Spinup.run; wait;
+    qsub -W block=true ./${RunName}_Spinup.run; wait;
 
     # check if exited with non-zero exit code
     [ ! -f ".error_status_file.txt" ] || imi_failed
@@ -171,11 +175,13 @@ if "$DoJacobian"; then
 
     if ! "$isAWS"; then
         # Load environment with modules for compiling GEOS-Chem Classic
-        source ${GEOSChemEnv} 
+        source ${GEOSChemEnv} | grep silenceoutput 
     fi
 
-    # Submit job to job scheduler
+    # Submit job to job scheduler   
     ./submit_jacobian_simulations_array.sh; wait;
+
+
 
     # check if any jacobians exited with non-zero exit code
     [ ! -f ".error_status_file.txt" ] || imi_failed
@@ -199,12 +205,15 @@ if "$DoInversion"; then
     if ! "$isAWS"; then
         # Activate Conda environment
         printf "\nActivating conda environment: ${CondaEnv}\n"
-        eval "$(conda shell.bash hook)"
-        conda activate $CondaEnv
+	#use ssmuse at eccc instead
+        #eval "$(conda shell.bash hook)"
+        #conda activate $CondaEnv
+	. ssmuse-sh -x hpco/exp/mib002/anaconda2/anaconda2-5.0.1-hpcobeta2
+	source activate geo
     fi
 
     # Execute inversion driver script
-    sbatch -W run_inversion.sh; wait;
+    qsub -W block=true ./run_inversion.sh; wait;
         
     printf "\n=== DONE RUNNING INVERSION ===\n"
 
@@ -222,14 +231,16 @@ if "$DoPosterior"; then
     
     if ! "$isAWS"; then
         # Load environment with modules for compiling GEOS-Chem Classic
-        source ${GEOSChemEnv}
+        source ${GEOSChemEnv} | grep silenceoutput
     fi
 
-    # Submit job to job scheduler
-    printf "\n=== SUBMITTING POSTERIOR SIMULATION ===\n"
-    sbatch -W ${RunName}_Posterior.run; wait;
-    printf "\n=== DONE POSTERIOR SIMULATION ===\n"
-
+   # Submit job to job scheduler
+     printf "\n=== SUBMITTING POSTERIOR SIMULATION ===\n"
+     qsub -W block=true ${RunName}_Posterior.run; wait;
+     printf "\n=== DONE POSTERIOR SIMULATION ===\n"
+    
+    source ~/.startconda
+    source activate geo
     cd ${RunDirs}/inversion
 
     # Fill missing data (first hour of simulation) in posterior output
@@ -250,7 +261,8 @@ if "$DoPosterior"; then
 
 	if ! "$isAWS"; then
     	# Load environment with NCO
-    	source ${NCOEnv}
+    	# source ${NCOEnv}
+	source ${GEOSChemEnv} | grep silenceoutput
 	fi
 
     # Sample GEOS-Chem atmosphere with TROPOMI
