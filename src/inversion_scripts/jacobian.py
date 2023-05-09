@@ -69,6 +69,7 @@ def read_tropomi(filename):
     temp['dry_air_subcolumns'] = xr.DataArray(tropomi_data["dry_air_subcolumns"])
     temp['surface_pressure'] = xr.DataArray(tropomi_data["surface_pressure"])
     temp['pressure_interval'] = xr.DataArray(tropomi_data["dp"])
+    temp['landflag'] = xr.DataArray(tropomi_data["landflag"])
     tropomi_data.close()
     
     tropomi_data = xr.open_dataset(filename, group="side_product")
@@ -90,6 +91,7 @@ def read_tropomi(filename):
     temp['dry_air_subcolumns'] = temp['dry_air_subcolumns'].where(temp['latitude']<1000,drop=True)
     temp['surface_pressure'] = temp['surface_pressure'].where(temp['latitude']<1000,drop=True)
     temp['pressure_interval'] = temp['pressure_interval'].where(temp['latitude']<1000,drop=True)
+    temp['landflag'] = temp['landflag'].where(temp['latitude']<1000,drop=True)
     temp['albedo'] = temp['albedo'].where(temp['latitude']<1000,drop=True)
     temp['longitude'] = temp['longitude'].where(temp['latitude']<1000,drop=True)
     temp['longitude_bounds'] = temp['longitude_bounds'].where(temp['latitude']<1000,drop=True)
@@ -125,6 +127,8 @@ def read_tropomi(filename):
 
     dat["column_AK"] = temp["column_AK"].values[:,::-1]
     
+    dat["landflag"] = temp["landflag"].values
+
     np.seterr(all='ignore') #suppress this message caused by NaN defaulted to max
     dat["methane_profile_apriori"] = temp["methane_profile_apriori"].values[:,::-1] * 10000 #mol cm-2 to mol m-2
     dat["dry_air_subcolumns"] = temp["dry_air_subcolumns"].values[:,::-1] * 10000 #mol cm-2 to mol m-2
