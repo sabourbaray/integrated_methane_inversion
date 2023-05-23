@@ -207,4 +207,5 @@ def filter_tropomi(tropomi_data, xlim, ylim, startdate, enddate):
         & (tropomi_data["qa_value"] >= 0.5)
         & (tropomi_data["swir_albedo"] > 0.05)
         & (tropomi_data["blended_albedo"] < 0.85)
+        & (tropomi_data["landflag"] == 0)
     )
