@@ -11,7 +11,7 @@
 run_preview() {
     if ! "$isAWS"; then
 	# Load environment with modules for running GEOS-Chem Classic
-        source ${GEOSChemEnv}
+        source ${GEOSChemEnv} | grep silenceoutput
     fi
 
     # Make sure template run directory exists
@@ -79,10 +79,13 @@ run_preview() {
 
     # Submit preview GEOS-Chem job to job scheduler
     if "$UseSlurm"; then
-        sbatch --mem $SimulationMemory -c $SimulationCPUs -t $RequestedTime -W ${RunName}_Preview.run; wait;
+       sbatch --mem $SimulationMemory -c $SimulationCPUs -t $RequestedTime -W ${RunName}_Preview.run; wait;
     else
-        ./${RunName}_Preview.run
+       qsub -l select=1:ncpus=$SimulationCPUs:mem=$SimulationMemory,walltime=$RequestedTime -W block=true ${RunName}_Preview.run; wait;
     fi
+
+    source activate geo
+
     # Run preview script
     config_path=${InversionPath}/${ConfigFile}
     state_vector_path=${RunDirs}/StateVector.nc
@@ -97,7 +100,7 @@ run_preview() {
         chmod +x $preview_file
         sbatch --mem $SimulationMemory -c $SimulationCPUs -t $RequestedTime -W $preview_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache; wait;
     else
-        python $preview_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache
+        qsub -l select=1:ncpus=64:mem=128gb -W block=true -- $preview_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache
     fi
     printf "\n=== DONE RUNNING IMI PREVIEW ===\n"
 

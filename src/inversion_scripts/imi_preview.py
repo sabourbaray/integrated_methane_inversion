@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/home/rsb001/.conda/envs/geo/bin/python
 # -*- coding: utf-8 -*-
 
 #SBATCH -N 1

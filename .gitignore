@@ -7,3 +7,5 @@ __pycache__/
 slurm-*.out
 *~
 imi_output.log
+.git-credentials
+backup

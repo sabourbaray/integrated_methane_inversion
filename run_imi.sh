@@ -48,8 +48,8 @@ eval $(parse_yaml ${ConfigFile})
 if ! "$isAWS"; then
     # Activate Conda environment
     printf "\nActivating conda environment: ${CondaEnv}\n"
-    eval "$(conda shell.bash hook)"
-    conda activate $CondaEnv
+    #eval "$(conda shell.bash hook)"
+    source activate geo
 fi
 
 # Check all necessary config variables are present

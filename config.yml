@@ -3,9 +3,9 @@
 
 ## General
 RunName: "Test_Permian_1week"
-isAWS: true
-UseSlurm: true
-SafeMode: true
+isAWS: false
+UseSlurm: false
+SafeMode: false
 
 ## Period of interest
 StartDate: 20180501
@@ -69,18 +69,18 @@ Met: "geosfp"
 ## Setup modules
 ##   Turn on/off different steps in setting up the inversion 
 SetupTemplateRundir: true
-SetupSpinupRun: false
-SetupJacobianRuns: false
-SetupInversion: false
-SetupPosteriorRun: false
+SetupSpinupRun: true
+SetupJacobianRuns: true
+SetupInversion: true
+SetupPosteriorRun: true
 
 ## Run modules
 ##   Turn on/off different steps in performing the inversion
 RunSetup: true
-DoSpinup: false
-DoJacobian: false
-DoInversion: false
-DoPosterior: false
+DoSpinup: true
+DoJacobian: true
+DoInversion: true
+DoPosterior: true
 
 ## IMI preview
 DoPreview: true
@@ -121,47 +121,51 @@ PLANEFLIGHT: false
 ## Turn on old observation operators in GEOS-Chem?
 ## These will save out text files comparing GEOS-Chem to observations, but have
 ## to be manually incorporated into the IMI
-GOSAT: false
+GOSAT: true
 TCCON: false
 AIRS: false
 
 ## resources to allocate to slurm jobs
-SimulationCPUs: 32
-SimulationMemory: 32000
-JacobianCPUs: 1
-JacobianMemory: 2000
-RequestedTime: "0-6:00"
+SimulationCPUs: 64
+SimulationMemory: "128GB"
+JacobianCPUs: 3
+JacobianMemory: "6GB"
+RequestedTime: "2:0:0"
 
 ##--------------------------------------------------------------------
 ## Settings for running on a local cluster
 ##--------------------------------------------------------------------
 
 ## Path for IMI runs and output
-OutputPath: "/home/ubuntu/imi_output_dir"
+OutputPath: "/home/rsb001/geoschem/imi_output_dir"
 
 ## Path to GEOS-Chem input data
-DataPath: "/home/ubuntu/ExtData"
+DataPath: "/home/rsb001/geoschem/ExtData"
+
+## Path to TROPOMI observations
+DataPathTROPOMI: "/home/rsb001/sitestore/data/tropomi/rpro/data"
 
 ## Environment files
 CondaFile: "/home/ubuntu/miniconda/etc/profile.d/conda.sh"
 CondaEnv: "geo"
 
 ## Download initial restart file from AWS S3?
-RestartDownload: true
+RestartDownload: false
 
 ## Path to initial GEOS-Chem restart file + prefix
 ##   ("YYYYMMDD_0000z.nc4" will be appended)
-RestartFilePrefix: "/home/ubuntu/ExtData/BoundaryConditions/GEOSChem.BoundaryConditions."
-RestartFilePreviewPrefix: "/home/ubuntu/ExtData/BoundaryConditions/GEOSChem.BoundaryConditions."
+RestartFilePrefix: "/home/rsb001/geoschem/ExtData/imi_bc_v3/GEOSChem.BoundaryConditions."
+RestartFilePreviewPrefix: "/home/rsb001/geoschem/ExtData/imi_bc_v3/GEOSChem.BoundaryConditions."
 
 ## Path to GEOS-Chem boundary condition files (for nested grid simulations)
-BCpath: "/home/ubuntu/ExtData/BoundaryConditions"
+BCpath: "/home/rsb001/geoschem/ExtData/imi_bc_v3"
+
 
 ## Options to download missing GEOS-Chem input data from AWS S3
 ##   NOTE: You will be charged if your ec2 instance is not in the
 ##         us-east-1 region.
-PreviewDryRun: true
-SpinupDryrun: true
-ProductionDryRun: true
-PosteriorDryRun: true
-BCdryrun: true
+PreviewDryRun: false
+SpinupDryrun: false
+ProductionDryRun: false
+PosteriorDryRun: false
+BCdryrun: false
