@@ -102,6 +102,7 @@ run_preview() {
     else
         export PYTHONPATH=${PYTHONPATH}:${InversionPath}/src/inversion_scripts/
         chmod +x $preview_file
+	#python $preview_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache
         qsub -l select=1:ncpus=64:mem=128gb -W block=true -- $preview_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache
     fi
     printf "\n=== DONE RUNNING IMI PREVIEW ===\n"

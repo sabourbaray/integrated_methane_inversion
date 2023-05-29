@@ -55,6 +55,7 @@ def get_TROPOMI_data(file_path, xlim, ylim, startdate_np64, enddate_np64):
     tropomi_data = {"lat": [], "lon": [], "xch4": [], "swir_albedo": []}
 
     # Load the TROPOMI data
+    print(f"attempting {file_path}")
     TROPOMI = read_tropomi(file_path)
 
     # Handle unreadable files
@@ -544,6 +545,7 @@ if __name__ == "__main__":
     preview_dir = sys.argv[4]
     tropomi_cache = sys.argv[5]
 
+  
     imi_preview(
         inversion_path, config_path, state_vector_path, preview_dir, tropomi_cache
     )

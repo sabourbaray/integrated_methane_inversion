@@ -10,4 +10,5 @@ imi_output.log
 .git-credentials
 backup
 configs
+config.yml
 *.yml
