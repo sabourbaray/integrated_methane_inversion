@@ -84,12 +84,12 @@ run_spinup() {
 
     if ! "$isAWS"; then
         # Load environment with modules for compiling GEOS-Chem Classic
-        source ${GEOSChemEnv}
+        source ${GEOSChemEnv} | grep silenceoutput
     fi
 
     # Submit job to job scheduler
-    sbatch --mem $SimulationMemory -c $SimulationCPUs -t $RequestedTime -W ${RunName}_Spinup.run; wait;
-
+    #sbatch --mem $SimulationMemory -c $SimulationCPUs -t $RequestedTime -W ${RunName}_Spinup.run; wait;
+    qsub -l select=1:ncpus=$SimulationCPUs:mem=$SimulationMemory,walltime=$RequestedTime -W block=true ${RunName}_Spinup.run; wait;
     # check if exited with non-zero exit code
     [ ! -f ".error_status_file.txt" ] || imi_failed $LINENO
 

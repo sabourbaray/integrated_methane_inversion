@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/rsb001/.conda/envs/geo/bin/python
 # -*- coding: utf-8 -*-
 
 import xarray as xr

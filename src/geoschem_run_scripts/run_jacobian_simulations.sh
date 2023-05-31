@@ -3,11 +3,15 @@
 #SBATCH -J {RunName}
 #SBATCH -N 1
 
+### Move to directory where command was issued
+cd $PBS_O_WORKDIR
+
 ### Run directory
 RUNDIR=$(pwd -P)
 
 ### Get current task ID
-x=${SLURM_ARRAY_TASK_ID}
+#x=${SLURM_ARRAY_TASK_ID}
+x=${PBS_ARRAY_INDEX}
 
 ### Add zeros to the cluster Id
 if [ $x -lt 10 ]; then

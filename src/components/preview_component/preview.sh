@@ -11,7 +11,7 @@
 run_preview() {
     if ! "$isAWS"; then
 	# Load environment with modules for running GEOS-Chem Classic
-        source ${GEOSChemEnv}
+        source ${GEOSChemEnv} | grep silenceoutput
     fi
 
     # Make sure template run directory exists
@@ -81,7 +81,8 @@ run_preview() {
     if "$UseSlurm"; then
         sbatch --mem $SimulationMemory -c $SimulationCPUs -t $RequestedTime -W ${RunName}_Preview.run; wait;
     else
-        ./${RunName}_Preview.run
+        #./${RunName}_Preview.run
+	qsub -l select=1:ncpus=$SimulationCPUs:mem=$SimulationMemory,walltime=$RequestedTime -W block=true ${RunName}_Preview.run; wait;
     fi
     # Run preview script
     config_path=${InversionPath}/${ConfigFile}
@@ -89,6 +90,7 @@ run_preview() {
     preview_dir=${RunDirs}/${runDir}
     tropomi_cache=${RunDirs}/data_TROPOMI
     preview_file=${InversionPath}/src/inversion_scripts/imi_preview.py
+    source activate geo
 
     # if running end to end script with sbatch then use
     # sbatch to take advantage of multiple cores 
@@ -97,7 +99,10 @@ run_preview() {
         chmod +x $preview_file
         sbatch --mem $SimulationMemory -c $SimulationCPUs -t $RequestedTime -W $preview_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache; wait;
     else
-        python $preview_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache
+        #python $preview_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache
+	export PYTHONPATH=${PYTHONPATH}:${InversionPath}/src/inversion_scripts/
+        chmod +x $preview_file
+	qsub -l select=1:ncpus=64:mem=128gb -W block=true -- $preview_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache
     fi
     printf "\n=== DONE RUNNING IMI PREVIEW ===\n"
 

@@ -95,6 +95,7 @@ setup_jacobian() {
 
 	# Create run script from template
 	sed -e "s:namename:${name}:g" ch4_run.template > ${name}.run
+	sed -i -e "/cd/d" ${name}.run
 	rm -f ch4_run.template
 	chmod 755 ${name}.run
 
@@ -129,7 +130,7 @@ run_jacobian() {
 
     if ! "$isAWS"; then
         # Load environment with modules for compiling GEOS-Chem Classic
-        source ${GEOSChemEnv} 
+        source ${GEOSChemEnv} | grep silenceoutput 
     fi
 
     # Submit job to job scheduler

@@ -4,6 +4,10 @@
 #SBATCH -o run_inversion_%j.out
 #SBATCH -e run_inversion_%j.err
 
+# Initialize for ECCC
+cd $PBS_O_WORKDIR
+source activate geo
+
 ##=======================================================================
 ## Parse config.yml file
 ##=======================================================================

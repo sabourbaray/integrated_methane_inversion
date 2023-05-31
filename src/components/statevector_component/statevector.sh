@@ -79,7 +79,8 @@ reduce_dimension() {
         chmod +x $aggregation_file
         sbatch --mem $SimulationMemory -c $SimulationCPUs -t $RequestedTime -W $aggregation_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache; wait;
     else
-        python $aggregation_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache
+        #python $aggregation_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache
+        qsub -l select=1:ncpus=$SimulationCPUs:mem=$SimulationMemory,walltime=$RequestedTime -W block=true -- $aggregation_file $InversionPath $config_path $state_vector_path $preview_dir $tropomi_cache	
     fi
     nElements=$(ncmax StateVector ${RunDirs}/StateVector.nc)
     printf "\nNumber of state vector elements in this inversion = ${nElements}\n\n"

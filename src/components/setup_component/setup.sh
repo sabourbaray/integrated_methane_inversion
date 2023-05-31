@@ -20,7 +20,7 @@ setup_imi() {
 			exit 1
 		else
 	        # Load environment with modules for compiling GEOS-Chem Classic
-    	    source ${GEOSChemEnv}
+    	    source ${GEOSChemEnv} | grep silenceoutput
     	fi
     fi
 
@@ -35,7 +35,7 @@ setup_imi() {
     UseBCsForRestart=true
 
     printf "\nActivating conda environment: ${CondaEnv}\n"
-    eval "$(conda shell.bash hook)"
+    #eval "$(conda shell.bash hook)"
     if "$isAWS"; then
         # Get max process count for spinup, production, and run_inversion scripts
         output=$(echo $(slurmd -C))
@@ -50,7 +50,8 @@ setup_imi() {
         fi
 
         # Source Conda environment file
-        source $CondaFile
+        #source $CondaFile
+	source activate geo
 
     fi
 
@@ -149,7 +150,8 @@ setup_imi() {
 
     if ! "$isAWS"; then
         # Load environment with NCO
-        source ${NCOEnv}
+        #source ${NCOEnv}
+	source ${GEOSChemEnv} | grep silenceoutput
     fi
 
     # Determine number of elements in state vector file

@@ -139,7 +139,7 @@ setup_template() {
 
     if ! "$isAWS"; then
 	# Load environment with modules for compiling GEOS-Chem Classic
-        source ${GEOSChemEnv}
+        source ${GEOSChemEnv} | grep silenceoutput
     fi
 
     # Remove sample restart file
@@ -150,6 +150,7 @@ setup_template() {
     
     # Compile GEOS-Chem and store executable in template run directory
     printf "\nCompiling GEOS-Chem...\n"
+    source deactivate
     cd build
     cmake ${InversionPath}/GCClassic >> build_geoschem.log 2>&1
     cmake . -DRUNDIR=..  >> build_geoschem.log 2>&1 
