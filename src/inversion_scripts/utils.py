@@ -210,6 +210,7 @@ def filter_tropomi(tropomi_data, xlim, ylim, startdate, enddate):
         & (tropomi_data["swir_albedo"] > 0.05)
         & (tropomi_data["blended_albedo"] < 0.85)
         & (tropomi_data["longitude_bounds"].ptp(axis=2) < 180)
+        & ((tropomi_data["surface_classification"].astype(int) & 0x03) == 0)
     )
 
 
