@@ -56,7 +56,7 @@ setup_imi() {
     fi
 
     # Activate Conda environment
-    conda activate $CondaEnv
+    source activate geo
 
     ##=======================================================================
     ## Download Boundary Conditions files if requested
