@@ -194,8 +194,7 @@ def filter_tropomi(tropomi_data, xlim, ylim, startdate, enddate):
     Description:
         Filter out any data that does not meet the following
         criteria: We only consider data within lat/lon/time bounds,
-        with QA > 0.5, with safe surface albedo values, and that
-        don't cross the antimeridian
+        with QA > 0.5 and that don't cross the antimeridian
     Returns:
         numpy array with satellite indices for filtered tropomi data.
     """
@@ -211,6 +210,7 @@ def filter_tropomi(tropomi_data, xlim, ylim, startdate, enddate):
         & (tropomi_data["blended_albedo"] < 0.85)
         & (tropomi_data["longitude_bounds"].ptp(axis=2) < 180)
         & ((tropomi_data["surface_classification"].astype(int) & 0x03) == 0)
+        & (tropomi_data["longitude_bounds"].ptp(axis=2) < 100)
     )
 
 
@@ -231,3 +231,4 @@ def calculate_area_in_km(coordinate_list):
     poly_area, _ = geod.geometry_area_perimeter(polygon)
 
     return abs(poly_area) * 1e-6
+    

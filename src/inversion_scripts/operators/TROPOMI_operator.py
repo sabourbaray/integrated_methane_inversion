@@ -80,8 +80,8 @@ def apply_average_tropomi_operator(
     # Read GEOS_Chem data for the dates of interest
     all_date_gc = read_all_geoschem(all_strdate, gc_cache, build_jacobian, sensi_cache)
 
-    # Initialize array with n_gridcells rows and 6 columns. Columns are TROPOMI CH4, GEOSChem CH4, longitude, latitude, observation counts
-    obs_GC = np.zeros([n_gridcells, 6], dtype=np.float32)
+    # Initialize array with n_gridcells rows and 5 columns. Columns are TROPOMI CH4, GEOSChem CH4, longitude, latitude, observation counts
+    obs_GC = np.zeros([n_gridcells, 5], dtype=np.float32)
     obs_GC.fill(np.nan)
 
     # For each gridcell dict with tropomi obs:
@@ -455,13 +455,10 @@ def read_tropomi(filename):
     # Initialize dictionary for TROPOMI data
     dat = {}
 
-    # Store methane, QA, lat, lon
+    # Catch read errors in any of the variables
     try:
+        # Store methane, QA, lat, lon
         tropomi_data = xr.open_dataset(filename, group="PRODUCT")
-    #except Exception as e:
-    #    print(f"Error opening {filename}: {e}")
-    #    return None
-
         dat["methane"] = tropomi_data["methane_mixing_ratio_bias_corrected"].values[0, :, :]
         dat["qa_value"] = tropomi_data["qa_value"].values[0, :, :]
         dat["longitude"] = tropomi_data["longitude"].values[0, :, :]
@@ -538,12 +535,12 @@ def read_tropomi(filename):
         tropomi_data = xr.open_dataset(filename, group="PRODUCT/SUPPORT_DATA/INPUT_DATA")
         dat["surface_classification"] = tropomi_data["surface_classification"].values[0, :, :]
     
+    # Return an error if any of the variables were not read correctly
     except Exception as e:
         print(f"Error opening {filename}: {e}")
         return None
 
     return dat
-
 
 def average_tropomi_observations(TROPOMI, gc_lat_lon, sat_ind):
     """
