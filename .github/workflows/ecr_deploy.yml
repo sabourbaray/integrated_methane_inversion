@@ -1,8 +1,8 @@
 name: Deploy to ECR
 # TODO: push branch when pushes to main
 on:
-  push:
-    workflow_dispatch:
+  workflow_dispatch:
+  #push:
     #branches: [ dev ]
 
 jobs:
