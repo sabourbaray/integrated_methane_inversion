@@ -2,9 +2,7 @@ name: Build Shell Variable Manifest
 # This github action automatically runs src/utilities/generate_var_manifest.py
 # and commits the resulting src/components/shell_variable_manifest.md to the repo
 on:
-  push:
-    branches:
-      - "dev"
+  workflow_dispatch:
 
 jobs:
   build:
