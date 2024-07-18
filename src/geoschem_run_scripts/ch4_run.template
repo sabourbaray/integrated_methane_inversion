@@ -4,11 +4,14 @@
 
 # Set the proper # of threads for OpenMP
 # SLURM_CPUS_PER_TASK ensures this matches the number you set with -c above
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+#export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 #-------------------------------------------------
 # Initialize
 #-------------------------------------------------
+# Move to directory where command was issued
+cd $PBS_O_WORKDIR
+
 # Define version ID
 id=namename
 

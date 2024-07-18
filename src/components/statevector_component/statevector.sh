@@ -94,7 +94,9 @@ reduce_dimension() {
         cat imi_output.tmp >> ${InversionPath}/imi_output.log
         rm imi_output.tmp
     else
-        python "${python_args[@]}"
+        #python "${python_args[@]}"
+	qsub -l select=1:ncpus=$SimulationCPUs:mem=$SimulationMemory,walltime=$RequestedTime \
+	     -W block=true -- "${python_args[@]}"; wait;
     fi
 
     # archive state vector file if using Kalman filter

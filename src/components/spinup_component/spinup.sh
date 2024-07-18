@@ -84,11 +84,14 @@ run_spinup() {
     cd ${RunDirs}/spinup_run
 
     # Submit job to job scheduler
-    sbatch --mem $RequestedMemory \
-    -c $RequestedCPUs \
-    -t $RequestedTime \
-    -p $SchedulerPartition \
-    -W ${RunName}_Spinup.run; wait;
+    #sbatch --mem $RequestedMemory \
+    #-c $RequestedCPUs \
+    #-t $RequestedTime \
+    #-p $SchedulerPartition \
+    #-W ${RunName}_Spinup.run; wait;
+
+    qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
+         -W block=true ${RunName}_Spinup.run; wait;
 
     # check if exited with non-zero exit code
     [ ! -f ".error_status_file.txt" ] || imi_failed $LINENO

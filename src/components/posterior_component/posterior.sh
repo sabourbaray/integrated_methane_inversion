@@ -143,13 +143,13 @@ run_posterior() {
 
     # Submit job to job scheduler
     printf "\n=== SUBMITTING POSTERIOR SIMULATION ===\n"
-    sbatch --mem $RequestedMemory \
-        -c $RequestedCPUs \
-        -t $RequestedTime \
-        -p $SchedulerPartition \
-        -W ${RunName}_Posterior.run
-    wait
-
+    #sbatch --mem $RequestedMemory \
+    #    -c $RequestedCPUs \
+    #    -t $RequestedTime \
+    #    -p $SchedulerPartition \
+    #    -W ${RunName}_Posterior.run
+    #wait
+    qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime -W block=true ${RunName}_Posterior.run; wait;
     # check if exited with non-zero exit code
     [ ! -f ".error_status_file.txt" ] || imi_failed $LINENO
 
@@ -174,7 +174,7 @@ run_posterior() {
     python ${InversionPath}/src/inversion_scripts/postproc_diags.py $RunName $PosteriorRunDir $PrevDir $StartDate_i $Res
     wait
     printf "\n=== DONE -- postproc_diags.py ===\n"
-
+    
     # Build directory for hourly posterior GEOS-Chem output data
     mkdir -p data_converted_posterior
     mkdir -p data_visualization_posterior
@@ -203,7 +203,15 @@ run_posterior() {
     buildJacobian="False"
 
     printf "\n=== Calling jacobian.py to sample posterior simulation (without jacobian sensitivity analysis) ===\n"
-    python ${InversionPath}/src/inversion_scripts/jacobian.py $StartDate_i $EndDate_i $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $tropomiCache $BlendedTROPOMI $isPost $buildJacobian False
+    #python ${InversionPath}/src/inversion_scripts/jacobian.py $StartDate_i $EndDate_i $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $tropomiCache $BlendedTROPOMI $isPost $buildJacobian False
+    
+    qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
+    	 -W block=true <<EOF
+#!/bin/bash
+cd ${RunDirs}/inversion
+source activate geo
+python ${InversionPath}/src/inversion_scripts/jacobian.py $StartDate_i $EndDate_i $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $tropomiCache $BlendedTROPOMI $isPost $buildJacobian False
+EOF
     wait
     printf "\n=== DONE sampling the posterior simulation ===\n\n"
     posterior_end=$(date +%s)

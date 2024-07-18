@@ -176,8 +176,10 @@ create_simulation_dir() {
     fi
 
     # Create run script from template
+    # Remove PBS_O_WORKDIR directory change
     sed -e "s:namename:${name}:g" ch4_run.template >${name}.run
     rm -f ch4_run.template
+    sed -i -e "/cd/d" ${name}.run
     chmod 755 ${name}.run
 
     ### Turn on observation operators if requested, only for base run
@@ -402,12 +404,14 @@ run_jacobian() {
         source submit_jacobian_simulations_array.sh
 
         if "$LognormalErrors"; then
-            sbatch --mem $RequestedMemory \
-                -c $RequestedCPUs \
-                -t $RequestedTime \
-                -p $SchedulerPartition \
-                -W run_bkgd_simulation.sh
-            wait
+	printf "\n=== running lognormal background ===\n"
+            #sbatch --mem $RequestedMemory \
+            #    -c $RequestedCPUs \
+            #    -t $RequestedTime \
+            #    -p $SchedulerPartition \
+            #    -W run_bkgd_simulation.sh
+            #wait
+            qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime -W block=true run_bkgd_simulation.sh; wait;
         fi
 
         # check if any jacobians exited with non-zero exit code
@@ -434,25 +438,28 @@ run_jacobian() {
 
         # Submit prior simulation to job scheduler
         printf "\n=== SUBMITTING PRIOR SIMULATION ===\n"
-        sbatch --mem $RequestedMemory \
-            -c $RequestedCPUs \
-            -t $RequestedTime \
-            -p $SchedulerPartition \
-            -W run_prior_simulation.sh
-        wait
-        cat imi_output.tmp >>${InversionPath}/imi_output.log
+        #sbatch --mem $RequestedMemory \
+        #    -c $RequestedCPUs \
+        #    -t $RequestedTime \
+        #    -p $SchedulerPartition \
+        #    -W run_prior_simulation.sh
+	
+	qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime -W block=true run_prior_simulation.sh; wait;
+        
+	cat imi_output.tmp >>${InversionPath}/imi_output.log
         rm imi_output.tmp
         printf "=== DONE PRIOR SIMULATION ===\n"
 
         # Run the background simulation if lognormal errors enabled
         if "$LognormalErrors"; then
             printf "\n=== SUBMITTING BACKGROUND SIMULATION ===\n"
-            sbatch --mem $RequestedMemory \
-                -c $RequestedCPUs \
-                -t $RequestedTime \
-                -p $SchedulerPartition \
-                -W run_bkgd_simulation.sh
-            wait
+            #sbatch --mem $RequestedMemory \
+            #    -c $RequestedCPUs \
+            #    -t $RequestedTime \
+            #    -p $SchedulerPartition \
+            #    -W run_bkgd_simulation.sh
+            
+	qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime -W block=true run_bkgd_simulation.sh; wait;
             printf "=== DONE BACKGROUND SIMULATION ===\n"
         fi
 

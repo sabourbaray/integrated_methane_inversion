@@ -4,7 +4,7 @@ import yaml
 import pickle as pickle
 import numpy as np
 import xarray as xr
-from src.inversion_scripts.utils import load_obj, calculate_superobservation_error
+from utils import load_obj, calculate_superobservation_error
 
 
 def merge_partial_k(satdat_dir, lat_bounds, lon_bounds, obs_err, precomp_K):

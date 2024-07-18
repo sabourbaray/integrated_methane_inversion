@@ -1,8 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=boundary_conditions
-#SBATCH --mem=4000
-#SBATCH --time=07-00:00
-#SBATCH --output=debug.log
+##SBATCH --job-name=boundary_conditions
+##SBATCH --mem=4000
+##SBATCH --time=07-00:00
+##SBATCH --output=debug.log
+
+#PBS -l select=1:ncpus=64:mem=256gb
+#PBS -N boundary_conditions
+#PBS -l walltime=6:0:0
+
+#Re-enter original directory
+cd $PBS_O_WORKDIR
 
 cwd="$(pwd)"
 
@@ -10,15 +17,15 @@ cwd="$(pwd)"
 condaEnv=$(grep -Po 'condaEnv:\s*\K.*' config_boundary_conditions.yml)
 condaFile=$(grep -Po 'condaFile:\s*\K.*' config_boundary_conditions.yml)
 condaFile=$(eval echo "$condaFile")
-source ${condaFile}
-conda activate ${condaEnv}
+#source ${condaFile}
+#conda activate ${condaEnv}
 eval $(python ../../src/utilities/parse_yaml.py config_boundary_conditions.yml)
 source ${geosChemEnv}
 echo "Environment file  --> ${geosChemEnv}" >> "${cwd}/boundary_conditions.log"
 
 # Information needed for GEOS-Chem simulations
-export GC_USER_REGISTERED=true
-export GC_DATA_ROOT="${geosChemDataPath}"
+#export GC_USER_REGISTERED=true
+#export GC_DATA_ROOT="${geosChemDataPath}"
 
 # As long as it doesn't exist, make the working directory and go to it
 if [[ -d "${workDir}" ]]; then

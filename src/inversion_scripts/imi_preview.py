@@ -241,7 +241,7 @@ def imi_preview(
         lat_bounds=None,
         levels=21,
         title="Prior emissions",
-        point_sources=get_point_source_coordinates(config),
+        #point_sources=get_point_source_coordinates(config),
         cbar_label="Emissions (kg km$^{-2}$ h$^{-1}$)",
         mask=mask,
         only_ROI=False,

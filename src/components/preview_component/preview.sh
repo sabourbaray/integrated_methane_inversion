@@ -90,6 +90,8 @@ run_preview() {
     preview_dir=${RunDirs}/${runDir}
     tropomi_cache=${RunDirs}/satellite_data
     preview_file=${InversionPath}/src/inversion_scripts/imi_preview.py
+    source activate geo
+    export PYTHONPATH=${PYTHONPATH}:${InversionPath}/src/inversion_scripts/
 
     # Run preview script
     # If running end to end script with sbatch then use
@@ -106,7 +108,16 @@ run_preview() {
         cat imi_output.tmp >> ${InversionPath}/imi_output.log
         rm imi_output.tmp
     else
-        python $preview_file $InversionPath $ConfigPath $state_vector_path $preview_dir $tropomi_cache
+        #python $preview_file $InversionPath $ConfigPath $state_vector_path $preview_dir $tropomi_cache
+	chmod +x $preview_file
+	qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
+     	     -W block=true <<EOF
+	     #!/bin/bash
+	     source activate geo
+	     export PYTHONPATH=${PYTHONPATH}:${InversionPath}/src/inversion_scripts/
+	     python $preview_file $InversionPath $ConfigPath $state_vector_path $preview_dir $tropomi_cache
+EOF
+	     wait;
     fi
     printf "\n=== DONE RUNNING IMI PREVIEW ===\n"
 

@@ -3,7 +3,7 @@
 import glob
 import numpy as np
 from netCDF4 import Dataset
-from src.inversion_scripts.utils import load_obj, calculate_superobservation_error
+from utils import load_obj, calculate_superobservation_error
 
 
 def do_inversion(

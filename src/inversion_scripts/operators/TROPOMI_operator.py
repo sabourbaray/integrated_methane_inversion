@@ -3,12 +3,12 @@ import xarray as xr
 import pandas as pd
 import datetime
 from shapely.geometry import Polygon
-from src.inversion_scripts.utils import (
+from utils import (
     filter_tropomi,
     filter_blended,
     get_strdate,
 )
-from src.inversion_scripts.operators.operator_utilities import (
+from operators.operator_utilities import (
     get_gc_lat_lon,
     read_all_geoschem,
     merge_pressure_grids,
