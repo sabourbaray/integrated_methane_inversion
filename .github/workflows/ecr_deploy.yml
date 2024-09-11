@@ -1,9 +1,6 @@
 name: Deploy to ECR
 on:
-  push:
-    branches: [ dev ]
-    tags:
-      - '*'
+  workflow_dispatch:
 
 jobs:
   
