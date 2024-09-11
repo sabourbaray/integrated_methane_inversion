@@ -163,11 +163,16 @@ run_posterior() {
 
     # Submit job to job scheduler
     printf "\n=== SUBMITTING POSTERIOR SIMULATION ===\n"
-    sbatch --mem $RequestedMemory \
-        -c $RequestedCPUs \
-        -t $RequestedTime \
-        -p $SchedulerPartition \
-        -W ${RunName}_Posterior.run
+    #sbatch --mem $RequestedMemory \
+    #    -c $RequestedCPUs \
+    #    -t $RequestedTime \
+    #    -p $SchedulerPartition \
+    #    -W ${RunName}_Posterior.run
+    #wait
+
+    qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
+            -W block=true \
+            ${RunName}_Posterior.run
     wait
 
     # check if exited with non-zero exit code
@@ -225,7 +230,14 @@ run_posterior() {
     kf_period=1
 
     printf "\n=== Calling jacobian.py to sample posterior simulation (without jacobian sensitivity analysis) ===\n"
-    python ${InversionPath}/src/inversion_scripts/jacobian.py ${ConfigPath} $StartDate_i $EndDate_i $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $tropomiCache $BlendedTROPOMI   $UseWaterObs $isPost $kf_period $buildJacobian False; wait
+    #python ${InversionPath}/src/inversion_scripts/jacobian.py ${ConfigPath} $StartDate_i $EndDate_i $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $tropomiCache $BlendedTROPOMI   $UseWaterObs $isPost $kf_period $buildJacobian False; wait
+    qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
+            -W block=true <<-EOF
+                #!/bin/bash
+                cd ${RunDirs}/inversion
+                source activate geo
+                python ${InversionPath}/src/inversion_scripts/jacobian.py ${ConfigPath} $StartDate_i $EndDate_i $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $tropomiCache $BlendedTROPOMI   $UseWaterObs $isPost $kf_period $buildJacobian False; wait
+EOF
     printf "\n=== DONE sampling the posterior simulation ===\n\n"
     posterior_end=$(date +%s)
 

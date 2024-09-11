@@ -2,6 +2,9 @@
 #SBATCH -J {RunName}
 #SBATCH -N 1
 
+# Move to directory where command was issued
+cd $PBS_O_WORKDIR
+
 ## This sc
 ### Run directory
 RUNDIR=$(pwd -P)

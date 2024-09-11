@@ -51,7 +51,17 @@ run_preview() {
         # check for any errors
         [ ! -f ".preview_error_status.txt" ] || imi_failed $LINENO
     else
-        python $preview_file $InversionPath $ConfigPath $state_vector_path $preview_dir $tropomi_cache
+        #python $preview_file $InversionPath $ConfigPath $state_vector_path $preview_dir $tropomi_cache
+        chmod +x $preview_file
+	    qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
+                    -W block=true <<-EOF
+	                #!/bin/bash
+	                source activate geo
+	                export PYTHONPATH=${PYTHONPATH}:${InversionPath}/src/inversion_scripts/
+	                python $preview_file $InversionPath $ConfigPath $state_vector_path $preview_dir $tropomi_cache
+EOF
+	    wait
+
     fi
     printf "\n=== DONE RUNNING IMI PREVIEW ===\n"
 

@@ -18,8 +18,9 @@ create_statevector() {
     fi
     
     # Use archived HEMCO standalone emissions output
-    HemcoDiagFile="${DataPath}/HEMCO/CH4/v2024-07/HEMCO_SA_Output/HEMCO_sa_diagnostics.${gridFile}.2023.nc"
-	
+    #HemcoDiagFile="${DataPath}/HEMCO/CH4/v2024-07/HEMCO_SA_Output/HEMCO_sa_diagnostics.${gridFile}.2023.nc"
+	HemcoDiagFile="${DataPath}/HEMCO/CH4/v2023-04/HEMCO_SA_Output/HEMCO_sa_diagnostics.${gridFile}.20190101.nc"
+    
     if "$isAWS"; then
         # Download land cover and HEMCO diagnostics files
         s3_lc_path="s3://gcgrid/GEOS_${gridDir}/${metDir}/${constYr}/01/${Met}.${constYr}0101.CN.${gridFile}.${RegionID}.${LandCoverFileExtension}"
@@ -92,7 +93,11 @@ reduce_dimension() {
         # check for any errors
         [ ! -f ".aggregation_error.txt" ] || imi_failed $LINENO
     else
-        python "${python_args[@]}"
+        #python "${python_args[@]}"
+        qsub -l select=1:ncpus=$SimulationCPUs:mem=$SimulationMemory,walltime=$RequestedTime \
+                -W block=true \
+                -- "${python_args[@]}"
+        wait
     fi
 
     # archive state vector file if using Kalman filter

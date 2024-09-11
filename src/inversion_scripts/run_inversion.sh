@@ -3,6 +3,10 @@
 #SBATCH -N 1
 #SBATCH -o run_inversion_%j.out
 
+# Initialize for ECCC
+cd $PBS_O_WORKDIR
+source activate geo
+
 ##=======================================================================
 ## Parse config.yml file
 ##=======================================================================
@@ -62,7 +66,7 @@ period_i={PERIOD}
 
 # For Kalman filter: assume first inversion period (( period_i = 1 )) by default
 # Switch is flipped to false automatically if (( period_i > 1 ))
-FirstSimSwitch=$1
+FirstSimSwitch=true
 
 printf "\n=== EXECUTING RUN_INVERSION.SH ===\n"
     

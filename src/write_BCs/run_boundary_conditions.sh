@@ -1,8 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=boundary_conditions
-#SBATCH --mem=4000
-#SBATCH --time=07-00:00
-#SBATCH --output=debug.log
+##SBATCH --job-name=boundary_conditions
+##SBATCH --mem=4000
+##SBATCH --time=07-00:00
+##SBATCH --output=debug.log
+
+#PBS -l select=1:ncpus=64:mem=256gb
+#PBS -N boundary_conditions
+#PBS -l walltime=6:0:0
+
+#Re-enter original directory
+cd $PBS_O_WORKDIR
 
 cwd="$(pwd)"
 
@@ -10,8 +17,9 @@ cwd="$(pwd)"
 condaEnv=$(grep -Po 'condaEnv:\s*\K.*' config_boundary_conditions.yml)
 condaFile=$(grep -Po 'condaFile:\s*\K.*' config_boundary_conditions.yml)
 condaFile=$(eval echo "$condaFile")
-source ${condaFile}
-conda activate ${condaEnv}
+#source ${condaFile}
+#conda activate ${condaEnv}
+source activate geo
 eval $(python ../../src/utilities/parse_yaml.py config_boundary_conditions.yml)
 source ${geosChemEnv}
 echo "Environment file  --> ${geosChemEnv}" >> "${cwd}/boundary_conditions.log"

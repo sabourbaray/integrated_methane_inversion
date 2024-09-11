@@ -77,6 +77,8 @@ run_prior() {
     sed -i -e "/#SBATCH -t 0-12:00/d" runHEMCO.sh
     sed -i -e "/#SBATCH -p huce_intel/d" runHEMCO.sh
     sed -i -e "/#SBATCH --mem=15000/d" runHEMCO.sh
+    sed -i -e "/export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK/d" runHEMCO.sh
+    sed -i -e '8i cd $PBS_O_WORKDIR' runHEMCO.sh
     sed -i '/.*hemco_standalone.*/a\
 retVal=$?\
 if [ $retVal -ne 0 ]; then\
@@ -107,6 +109,7 @@ fi' runHEMCO.sh
     # Compile HEMCO and store executable in template run directory
     printf "\nCompiling HEMCO...\n"
     cd build
+    source deactivate
     cmake ${InversionPath}/GCClassic/src/HEMCO >>build_hemco.log 2>&1
     cmake . -DRUNDIR=.. >>build_hemco.log 2>&1
     make -j install >>build_hemco.log 2>&1
@@ -120,7 +123,7 @@ fi' runHEMCO.sh
         exit 999
     fi
     printf "\nDone compiling HEMCO \n\nSee ${RunDirs}/prior_run/HEMCO_build_info for details\n\n"
-
+    source activate geo
     printf "\nSubmitting prior emissions hemco simulation\n\n"
 
     run_hemco_sa $StartDate $EndDate
@@ -146,12 +149,17 @@ run_hemco_sa() {
     
     rm -f .error_status_file.txt
     # Submit job to job scheduler
-    sbatch --mem $RequestedMemory \
-        -c $RequestedCPUs \
-        -t $RequestedTime \
-        -o ${RunName}_Prior.log \
-        -p $SchedulerPartition \
-        -W ${RunName}_Prior.run
+    #sbatch --mem $RequestedMemory \
+    #    -c $RequestedCPUs \
+    #    -t $RequestedTime \
+    #    -o ${RunName}_Prior.log \
+    #    -p $SchedulerPartition \
+    #    -W ${RunName}_Prior.run
+    #wait
+
+    qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
+            -W block=true \
+            ${RunName}_Prior.run
     wait
 
     # check if exited with non-zero exit code

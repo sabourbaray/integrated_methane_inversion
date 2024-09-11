@@ -8,8 +8,8 @@ import re
 import os
 import datetime
 import yaml
-from src.inversion_scripts.utils import save_obj
-from src.inversion_scripts.operators.TROPOMI_operator import (
+from utils import save_obj
+from operators.TROPOMI_operator import (
     apply_average_tropomi_operator,
     apply_tropomi_operator,
 )
