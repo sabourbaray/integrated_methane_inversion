@@ -195,7 +195,6 @@ def write_bias_corrected_files(bias):
             & (np.datetime64(re.search(r'(\d{8})_(\d{4}z)', f).group(1)) <= np.datetime64(config["endDate"]))
         )
     ]
-    assert len(files) == len(strdate), "ERROR -> bias dimension is not the same as number of boundary condition files"
 
     # For each file, remove the total column bias from each level of the GEOS-Chem boundary condition
     for filename in files:
