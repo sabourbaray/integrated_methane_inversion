@@ -1,23 +1,23 @@
 ## Date range (inclusive) that you want to generate BCs for
 startDate: "20180401"
-endDate: "20240229"
+endDate: "20180501"
 
 ## A directory with a lot of space where you can write the BCs (and intermediate files)
-workDir: "/n/holylfs05/LABS/jacob_lab/Users/nbalasus/v2024-06-IMI-BCs"
+workDir: "/fs/site5/eccc/crd/ccmr/users/rsb001/geoschem/ExtData/imi_bc_v2024-06/test/test"
 
 ## Paths to TROPOMI data and blended TROPOMI+GOSAT data
-tropomiDir: "/n/holylfs05/LABS/jacob_lab/Everyone/imi/ch4/tropomi"
-blendedDir: "/n/holylfs05/LABS/jacob_lab/Everyone/imi/ch4/blended"
+tropomiDir: "/fs/site5/eccc/crd/ccmr/users/rsb001/data/tropomi/rpro/data"
+blendedDir: "/fs/site6/eccc/aq/r3/mas001/msh/satdata/level2/tropomi/s5p/ch4/harvard/nc/2018"
 
 ## Conda environment to use, GEOS-Chem environment to use, GEOS-Chem input data path, and partitions to run on
 condaEnv: geo
 condaFile: ~/.bashrc
 geosChemEnv: "/home/rsb001/.profile.d/default/post"
 geosChemDataPath: "/home/rsb001/geoschem/ExtData"
-partition: huce_cascade,seas_compute,huce_ice
+partition: ppp5
 
 ## A restart file for GEOS-Chem for your simulation start date
-restartFilePath: "/path/to/restart/file"
+restartFilePath: "/fs/site5/eccc/crd/ccmr/users/rsb001/geoschem/ExtData/imi_bc_v2024-06/restarts/GEOSChem.Restart.20180401_0000z.nc4"
 
 # Debug or not?
 debug: true

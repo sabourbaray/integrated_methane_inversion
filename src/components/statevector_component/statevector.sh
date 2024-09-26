@@ -18,8 +18,7 @@ create_statevector() {
     fi
     
     # Use archived HEMCO standalone emissions output
-    #HemcoDiagFile="${DataPath}/HEMCO/CH4/v2024-07/HEMCO_SA_Output/HEMCO_sa_diagnostics.${gridFile}.2023.nc"
-	HemcoDiagFile="${DataPath}/HEMCO/CH4/v2023-04/HEMCO_SA_Output/HEMCO_sa_diagnostics.${gridFile}.20190101.nc"
+    HemcoDiagFile="${DataPath}/HEMCO/CH4/v2024-07/HEMCO_SA_Output/HEMCO_sa_diagnostics.${gridFile}.2023.nc"
     
     if "$isAWS"; then
         # Download land cover and HEMCO diagnostics files

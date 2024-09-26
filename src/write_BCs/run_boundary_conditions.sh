@@ -4,12 +4,12 @@
 ##SBATCH --time=07-00:00
 ##SBATCH --output=debug.log
 
-#PBS -l select=1:ncpus=64:mem=256gb
+#PBS -l select=1:ncpus=32:mem=64GB
 #PBS -N boundary_conditions
 #PBS -l walltime=6:0:0
 
-#Re-enter original directory
-cd $PBS_O_WORKDIR
+#Re-enter original directory, but don't need if running from terminal
+#cd $PBS_O_WORKDIR
 
 cwd="$(pwd)"
 
@@ -21,6 +21,7 @@ condaFile=$(eval echo "$condaFile")
 #conda activate ${condaEnv}
 source activate geo
 eval $(python ../../src/utilities/parse_yaml.py config_boundary_conditions.yml)
+source deactivate
 source ${geosChemEnv}
 echo "Environment file  --> ${geosChemEnv}" >> "${cwd}/boundary_conditions.log"
 
@@ -40,10 +41,12 @@ mkdir -p "${workDir}/blended-boundary-conditions"
 cd "${workDir}"
 
 # Get GCClassic v14.4.1 and create the run directory
-git clone https://github.com/geoschem/GCClassic.git
+# Copy from IMI directory instead
+#git clone https://github.com/geoschem/GCClassic.git
+#git checkout 14.4.1
+#git submodule update --init --recursive
+cp -r /home/rsb001/geoschem/dev_imi/GCClassic .
 cd GCClassic
-git checkout 14.4.1
-git submodule update --init --recursive
 cd run
 runDir="gc_run"
 c="9\n2\n2\n2\n${workDir}\n${runDir}\nn\n" # CH4, GEOS-FP, 2.0 x 2.5, 47L
@@ -114,17 +117,41 @@ if ! ${debug}; then
 fi
 
 # Modify and submit the run script
-cp runScriptSamples/operational_examples/harvard_cannon/geoschem.run .
-sed -i -e "s|sapphire,huce_cascade,seas_compute,shared|${partition}|g" \
-    -e "s|--mem=15000|--mem=128000|g" \
-    -e "s|-t 0-12:00|-t 07-00:00|g"\
-    -e "s|-c 8|-c 48|g" geoschem.run
-sbatch -W geoschem.run; wait;
+#cp runScriptSamples/operational_examples/harvard_cannon/geoschem.run .
+#sed -i -e "s|sapphire,huce_cascade,seas_compute,shared|${partition}|g" \
+#    -e "s|--mem=15000|--mem=128000|g" \
+#    -e "s|-t 0-12:00|-t 07-00:00|g"\
+#    -e "s|-c 8|-c 48|g" geoschem.run
+#sbatch -W geoschem.run; wait;
+
+# Use the IMI run script instead
+cp /home/rsb001/geoschem/dev_imi/src/geoschem_run_scripts/ch4_run.template .
+    # Modify the run script
+    sed -e "s:namename:write_bcs:g" \
+        -e "s:##:#:g" ch4_run.template > write_bcs.run
+    chmod 755 write_bcs.run
+    rm -f ch4_run.template
+
+# Submit the run script for the simulation using PBS Pro
+    qsub -l select=1:ncpus=64:mem="128GB",walltime="6:0:0" \
+            -W block=true \
+            write_bcs.run
+    wait
 
 # Write the boundary conditions using write_boundary_conditions.py
 cd "${cwd}"
-sbatch -W -J blended -o boundary_conditions.log --open-mode=append -p ${partition} -t 7-00:00 --mem 96000 -c 40 --wrap "source $condaFile; conda activate $condaEnv; python write_boundary_conditions.py True $blendedDir $gcStartDate $gcEndDate"; wait; # run for Blended TROPOMI+GOSAT
-sbatch -W -J tropomi -o boundary_conditions.log --open-mode=append -p ${partition} -t 7-00:00 --mem 96000 -c 40 --wrap "source $condaFile; conda activate $condaEnv; python write_boundary_conditions.py False $tropomiDir $gcStartDate $gcEndDate"; wait; # run for TROPOMI data
+#sbatch -W -J blended -o boundary_conditions.log --open-mode=append -p ${partition} -t 7-00:00 --mem 96000 -c 40 --wrap "source $condaFile; conda activate $condaEnv; python write_boundary_conditions.py True $blendedDir $gcStartDate $gcEndDate"; wait; # run for Blended TROPOMI+GOSAT
+#sbatch -W -J tropomi -o boundary_conditions.log --open-mode=append -p ${partition} -t 7-00:00 --mem 96000 -c 40 --wrap "source $condaFile; conda activate $condaEnv; python write_boundary_conditions.py False $tropomiDir $gcStartDate $gcEndDate"; wait; # run for TROPOMI data
+
+# Submit job for Blended TROPOMI+GOSAT boundary conditions
+qsub -N blended -o boundary_conditions.log -j oe -l select=1:ncpus=36:mem=128GB,walltime=6:0:0 -V -- \
+    bash -c "source activate geo; python write_boundary_conditions.py True $blendedDir $gcStartDate $gcEndDate"; wait;
+
+# Submit job for SRON TROPOMI data boundary conditions
+qsub -N tropomi -o boundary_conditions.log -j oe -l select=1:ncpus=36:mem=128GB,walltime=6:0:0 -V -- \
+    bash -c "source activate geo; python write_boundary_conditions.py False $tropomiDir $gcStartDate $gcEndDate"; wait;
+
+# Append results to the log file
 echo "" >> "${cwd}/boundary_conditions.log"
 echo "Blended TROPOMI+GOSAT boundary conditions --> ${workDir}/blended-boundary-conditions" >> "${cwd}/boundary_conditions.log"
 echo "TROPOMI boundary conditions               --> ${workDir}/tropomi-boundary-conditions" >> "${cwd}/boundary_conditions.log"

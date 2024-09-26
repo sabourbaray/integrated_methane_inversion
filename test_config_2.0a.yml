@@ -117,7 +117,7 @@ SetupPosteriorRun: true
 DoPriorEmis: true
 DoSpinup: true
 DoJacobian: true
-ReDoJacobian: true
+ReDoJacobian: false
 DoInversion: true
 DoPosterior: true
 
@@ -208,12 +208,12 @@ RestartDownload: false
 
 ## Path to initial GEOS-Chem restart file + prefix
 ##   ("YYYYMMDD_0000z.nc4" will be appended)
-RestartFilePrefix: "/home/rsb001/geoschem/ExtData/imi_bc_blended/v2023-06/GEOSChem.BoundaryConditions."
+RestartFilePrefix: "/home/rsb001/geoschem/ExtData/imi_bc/blnd/v2024-06/GEOSChem.BoundaryConditions."
 
 ## Path to GEOS-Chem boundary condition files (for regional simulations)
 ## BCversion will be appended to the end of this path. ${BCpath}/${BCversion}
-BCpath: "/home/rsb001/geoschem/ExtData/imi_bc_blended"
-BCversion: "v2023-06"
+BCpath: "/home/rsb001/geoschem/ExtData/imi_bc/blnd"
+BCversion: "v2024-06"
 
 ## Options to download missing GEOS-Chem input data from AWS S3
 PriorDryRun: false
