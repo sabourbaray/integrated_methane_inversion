@@ -14,3 +14,4 @@ slurm-*.out
 .env
 backup/*
 configs/*
+modelversions/
