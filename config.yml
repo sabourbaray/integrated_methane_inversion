@@ -2,10 +2,10 @@
 ## Documentation @ https://imi.readthedocs.io/en/latest/getting-started/imi-config-file.html
 
 ## General
-RunName: "Test_Permian_1week"
-isAWS: true
+RunName: "Test_IMI_Permian_merra2"
+isAWS: false
 UseSlurm: true
-SafeMode: true
+SafeMode: false
 S3Upload: false
 
 ## Period of interest
@@ -16,7 +16,7 @@ SpinupMonths: 1
 ## Use blended TROPOMI+GOSAT data (true)? Or use operational TROPOMI data (false)?
 BlendedTROPOMI: false
 
-## Use observations over water? Set to false to filter out water observations
+## Use observations over water? Set to false to filter out water observations 
 UseWaterObs: false
 
 ## Is this a regional inversion? Set to false for global inversion
@@ -25,7 +25,7 @@ isRegional: true
 ## Select two character region ID (for using pre-cropped meteorological fields)
 ##   Current options are listed below with ([lat],[lon]) bounds:
 ##     "AF" : Africa ([-37,40], [-20,53])
-##     "AS" : Asia ([-11,55],[60,150])
+##     "AS" : Asia ([-11,55],[60,150]) 
 ##     "EU" : Europe ([33,61],[-30,70])
 ##     "ME" : Middle East ([12,50], [-20,70])
 ##     "NA" : North America ([10,70],[-140,-40])
@@ -48,7 +48,7 @@ LatMax: 33
 KalmanMode: false
 UpdateFreqDays: 7
 NudgeFactor: 0.1
-MakePeriodsCSV: true
+MakePeriodsCSV: false
 CustomPeriodsCSV: "/path/to/periods.csv"
 
 ## State vector
@@ -69,15 +69,15 @@ ReducedDimensionStateVector: false
 DynamicKFClustering: false
 ClusteringMethod: "kmeans"
 NumberOfElements: 45
-ForcedNativeResolutionElements:
+ForcedNativeResolutionElements: 
   - [31.5, -104]
 EmissionRateFilter: 2500
 PlumeCountFilter: 50
 GroupByCountry: false
 
 ## Custom state vector
-StateVectorFile: "/home/ubuntu/integrated_methane_inversion/resources/statevectors/StateVector.nc"
-ShapeFile: "/home/ubuntu/integrated_methane_inversion/resources/shapefiles/PermianBasin_Extent_201712.shp"
+StateVectorFile: "/n/holylfs05/LABS/jacob_lab/Users/msulprizio/Test_IMI_Permian_merra2/StateVector.nc"
+ShapeFile: "resources/shapefiles/PermianBasin_Extent_201712.shp"
 
 ## Inversion
 ## Notes:
@@ -97,20 +97,20 @@ PrecomputedJacobian: false
 
 ## Grid
 ##   Options are 0.25x0.3125 (GEOSFP only), 0.5x0.625, 2.0x2.5, or 4.0x5.0
-Res: "0.25x0.3125"
+Res: "0.5x0.625"
 
 ## Meteorology
 ##   Options are GEOSFP or MERRA2
-Met: "GEOSFP"
+Met: "MERRA2"
 
 ## Setup modules
-##   Turn on/off different steps in setting up the inversion
+##   Turn on/off different steps in setting up the inversion 
 RunSetup: true
 SetupTemplateRundir: true
-SetupSpinupRun: false
-SetupJacobianRuns: false
-SetupInversion: false
-SetupPosteriorRun: false
+SetupSpinupRun: true
+SetupJacobianRuns: true
+SetupInversion: true
+SetupPosteriorRun: true
 
 ## Run modules
 ##   Turn on/off different steps in performing the inversion
@@ -123,15 +123,15 @@ DoPosterior: false
 
 ## IMI preview
 ##   NOTE: RunSetup must be true to run preview
-DoPreview: true
+DoPreview: false
 DOFSThreshold: 0
 
 ## Resource allocation settings for slurm jobs
-RequestedCPUs: 8
-RequestedMemory: 10000
-InversionCPUs: 32
-InversionMemory: 32000
-RequestedTime: "0-24:00"
+RequestedCPUs: 64
+RequestedMemory: "128GB"
+RequestedTime: "6:0:0"
+InversionCPUs: 64
+InversionMemory: "128GB"
 SchedulerPartition: "debug"
 
 ## Max number of simultaneous Jacobian runs from the job array (-1: no limit)
@@ -139,7 +139,7 @@ MaxSimultaneousRuns: -1
 
 ## Number of Jacobians tracers to use for each jacobian simulation
 ##   Specifying a value = 1 will submit a separate jacobian simulation for each
-##   state vector element. Specifying a value > 1 will combine state vector
+##   state vector element. Specifying a value > 1 will combine state vector 
 ##   elements into a single jacobian simulation.
 NumJacobianTracers: 5
 
@@ -159,8 +159,8 @@ NumJacobianTracers: 5
 ##--------------------------------------------------------------------
 
 ## Jacobian settings
-## Note PerturbValue is in 1e-8 kg/m2/s. eg specifying 1 means the
-## perturbation will be 1e-8 kg/m2/s
+## Note PerturbValue is in 1e-8 kg/m2/s. eg specifying 1 means the 
+## perturbation will be 1e-8 kg/m2/s 
 ## PerturbValueOH is a relative scale factor and PerturbValueBCs is in ppb
 PerturbValue: 1.0
 PerturbValueOH: 1.1
@@ -188,31 +188,36 @@ AIRS: false
 ##------------------------------------------------------------------
 
 ## Path for IMI runs and output
-OutputPath: "/home/ubuntu/imi_output_dir"
+OutputPath: "/home/rsb001/geoschem/imi_output_dir"
 
 ## Path to GEOS-Chem input data
-DataPath: "/home/ubuntu/ExtData"
+DataPath: "/home/rsb001/geoschem/ExtData"
+
+## Path to TROPOMI observations
+DataPathTROPOMI: "/home/rsb001/sitestore/data/tropomi/rpro"
 
 ## Conda environment file
-CondaFile: "/home/ubuntu/.bashrc"
+CondaFile: "/home/rsb001/.bashrc"
 CondaEnv: "imi_env"
+GEOSChemEnv: "$GEOSChemEnv"
 
 ## Download initial restart file from AWS S3?
 ##  NOTE: Must have AWS CLI enabled
-RestartDownload: true
+RestartDownload: false
 
 ## Path to initial GEOS-Chem restart file + prefix
 ##   ("YYYYMMDD_0000z.nc4" will be appended)
-RestartFilePrefix: "/home/ubuntu/ExtData/BoundaryConditions/v2024-06/GEOSChem.BoundaryConditions."
+RestartFilePrefix: "/home/rsb001/geoschem/ExtData/imi_bc/sron/v2024-06/GEOSChem.BoundaryConditions."
 
 ## Path to GEOS-Chem boundary condition files (for regional simulations)
 ## BCversion will be appended to the end of this path. ${BCpath}/${BCversion}
-BCpath: "/home/ubuntu/ExtData/BoundaryConditions"
+BCpath: "/home/rsb001/geoschem/ExtData/imi_bc/sron"
 BCversion: "v2024-06"
 
 ## Options to download missing GEOS-Chem input data from AWS S3
-HemcoPriorEmisDryRun: true
-SpinupDryrun: true
-ProductionDryRun: true
-PosteriorDryRun: true
-BCdryrun: true
+##   NOTE: Must have AWS CLI enabled
+HemcoPriorEmisDryRun: false
+SpinupDryrun: false
+ProductionDryRun: false
+PosteriorDryRun: false
+BCdryrun: false

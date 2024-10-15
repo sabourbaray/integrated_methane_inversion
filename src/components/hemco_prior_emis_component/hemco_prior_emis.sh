@@ -77,6 +77,8 @@ run_hemco_prior_emis() {
     sed -i -e "/#SBATCH -t 0-12:00/d" runHEMCO.sh
     sed -i -e "/#SBATCH -p huce_intel/d" runHEMCO.sh
     sed -i -e "/#SBATCH --mem=15000/d" runHEMCO.sh
+    sed -i -e "/export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK/d" runHEMCO.sh
+    sed -i -e '8i cd $PBS_O_WORKDIR' runHEMCO.sh
     sed -i '/.*hemco_standalone.*/a\
 retVal=$?\
 if [ $retVal -ne 0 ]; then\
@@ -86,6 +88,7 @@ if [ $retVal -ne 0 ]; then\
     exit $retVal\
 fi' runHEMCO.sh
 
+    source activate imi_env
     sa_XMIN=$(python ${InversionPath}/src/components/hemco_prior_emis_component/get_hemco_grid_vars.py ${RunDirs}/StateVector.nc XMIN)
     sa_XMAX=$(python ${InversionPath}/src/components/hemco_prior_emis_component/get_hemco_grid_vars.py ${RunDirs}/StateVector.nc XMAX)
     sa_YMIN=$(python ${InversionPath}/src/components/hemco_prior_emis_component/get_hemco_grid_vars.py ${RunDirs}/StateVector.nc YMIN)
@@ -107,6 +110,7 @@ fi' runHEMCO.sh
     # Compile HEMCO and store executable in template run directory
     printf "\nCompiling HEMCO...\n"
     cd build
+    source deactivate
     cmake ${InversionPath}/GCClassic/src/HEMCO >>build_hemco.log 2>&1
     cmake . -DRUNDIR=.. >>build_hemco.log 2>&1
     make -j install >>build_hemco.log 2>&1
@@ -120,6 +124,7 @@ fi' runHEMCO.sh
         exit 999
     fi
     printf "\nDone compiling HEMCO \n\nSee ${RunDirs}/${HEMCOdir}/HEMCO_build_info for details\n\n"
+    source activate imi_env
 
     printf "\nSubmitting HEMCO prior emissions simulation\n\n"
 
@@ -146,12 +151,17 @@ run_hemco_sa() {
 
     rm -f .error_status_file.txt
     # Submit job to job scheduler
-    sbatch --mem $RequestedMemory \
-        -c $RequestedCPUs \
-        -t $RequestedTime \
-        -o ${RunName}_HEMCO_Prior_Emis.log \
-        -p $SchedulerPartition \
-        -W ${RunName}_HEMCO_Prior_Emis.run
+    #sbatch --mem $RequestedMemory \
+    #    -c $RequestedCPUs \
+    #    -t $RequestedTime \
+    #    -o ${RunName}_HEMCO_Prior_Emis.log \
+    #    -p $SchedulerPartition \
+    #    -W ${RunName}_HEMCO_Prior_Emis.run
+    #wait
+
+    qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
+            -W block=true \
+            ${RunName}_HEMCO_Prior_Emis.run
     wait
 
     # check if exited with non-zero exit code

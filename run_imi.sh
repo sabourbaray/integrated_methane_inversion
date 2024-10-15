@@ -59,11 +59,12 @@ CondaFile=$(eval echo $(grep '^CondaFile:' ${ConfigFile} |
     tr -d '"'))
 
 # Load conda/mamba/micromamba e.g. ~/.bashrc
-source $CondaFile
+#source $CondaFile
 
 # Activate Conda environment
 printf "\nActivating conda environment: ${CondaEnv}\n"
-conda activate ${CondaEnv}
+#conda activate ${CondaEnv}
+source activate imi_env
 
 # Parsing the config file
 eval $(python src/utilities/parse_yaml.py ${ConfigFile})
@@ -81,6 +82,7 @@ if ! "$isAWS"; then
 fi
 
 # Check all necessary config variables are present
+source activate imi_env
 python src/utilities/sanitize_input_yaml.py $ConfigFile || imi_failed
 
 # Set path to IMI runs

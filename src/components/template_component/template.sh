@@ -150,6 +150,8 @@ setup_template() {
 
     # Compile GEOS-Chem and store executable in GEOSChem_build directory
     printf "\nCompiling GEOS-Chem...\n"
+    source deactivate
+    source ${GEOSChemEnv}
     cd build
     cmake ${InversionPath}/GCClassic >>build_geoschem.log 2>&1
     cmake . -DRUNDIR=.. >>build_geoschem.log 2>&1
@@ -166,6 +168,7 @@ setup_template() {
     printf "\nDone compiling GEOS-Chem \n\nSee ${RunDirs}/GEOSChem_build_info for details\n\n"
 
     # Navigate back to top-level directory
+    source activate imi_env
     cd ..
 
     printf "\n=== DONE CREATING TEMPLATE RUN DIRECTORY ===\n"
