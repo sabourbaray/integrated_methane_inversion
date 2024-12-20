@@ -25,6 +25,7 @@ from src.inversion_scripts.utils import (
     plot_field,
     filter_tropomi,
     filter_blended,
+    filter_bremen,
     calculate_area_in_km,
     calculate_superobservation_error,
     get_mean_emissions,
@@ -34,23 +35,25 @@ from joblib import Parallel, delayed
 from src.inversion_scripts.operators.TROPOMI_operator import (
     read_tropomi,
     read_blended,
+    read_bremen,
 )
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+valid_data_product = ['sron', 'blnd', 'bremen']
 
 def get_TROPOMI_data(
-    file_path, BlendedTROPOMI, xlim, ylim, startdate_np64, enddate_np64, use_water_obs
+    file_path, DataProduct, xlim, ylim, startdate_np64, enddate_np64, use_water_obs
 ):
     """
-    Returns a dict with the lat, lon, xch4, and albedo_swir observations
-    extracted from the given tropomi file. Filters are applied to remove
-    unsuitable observations
+    Returns a dict with the lat, lon, xch4, and albedo (swir or apparent)
+    observations extracted from the given tropomi file. Filters are 
+    applied to remove unsuitable observations
     Args:
-        file_path : string
+        file_path   : string
             path to the tropomi file
-        BlendedTROPOMI : bool
-            if True, use blended TROPOMI+GOSAT data
+        DataProduct : string
+            data product to use (sron, blnd, or bremen)
         xlim: list
             longitudinal bounds for region of interest
         ylim: list
@@ -66,26 +69,33 @@ def get_TROPOMI_data(
             dictionary of the extracted values
     """
     # tropomi data dictionary
-    tropomi_data = {"lat": [], "lon": [], "xch4": [], "swir_albedo": [], "time": []}
+    tropomi_data = {"lat": [], "lon": [], "xch4": [], "albedo": [], "time": []}
 
     # Load the TROPOMI data
-    assert isinstance(BlendedTROPOMI, bool), "BlendedTROPOMI is not a bool"
-    if BlendedTROPOMI:
+    assert DataProduct in valid_data_product, f"DataProduct must be one of {valid_data_product}"
+    if DataProduct == 'blnd':
         TROPOMI = read_blended(file_path)
-    else:
+    elif DataProduct == 'sron':
         TROPOMI = read_tropomi(file_path)
+    elif DataProduct == 'bremen':
+        TROPOMI = read_bremen(file_path)
     if TROPOMI == None:
         print(f"Skipping {file_path} due to error")
         return TROPOMI
-
-    if BlendedTROPOMI:
+    
+    if DataProduct == 'blnd':
         # Only going to consider data within lat/lon/time bounds and without problematic coastal pixels
         sat_ind = filter_blended(
             TROPOMI, xlim, ylim, startdate_np64, enddate_np64, use_water_obs
         )
-    else:
+    elif DataProduct == 'sron':
         # Only going to consider data within lat/lon/time bounds, with QA > 0.5, and with safe surface albedo values
         sat_ind = filter_tropomi(
+            TROPOMI, xlim, ylim, startdate_np64, enddate_np64, use_water_obs
+        )
+    else:
+        # Only going to consider TROPOMI data within lat/lon/time bounds and with other filters
+        sat_ind = filter_bremen(
             TROPOMI, xlim, ylim, startdate_np64, enddate_np64, use_water_obs
         )
 
@@ -97,9 +107,14 @@ def get_TROPOMI_data(
         tropomi_data["lat"].append(TROPOMI["latitude"][lat_idx, lon_idx])
         tropomi_data["lon"].append(TROPOMI["longitude"][lat_idx, lon_idx])
         tropomi_data["xch4"].append(TROPOMI["methane"][lat_idx, lon_idx])
-        tropomi_data["swir_albedo"].append(TROPOMI["swir_albedo"][lat_idx, lon_idx])
         tropomi_data["time"].append(TROPOMI["time"][lat_idx, lon_idx])
-
+        
+        # Supposed to store SWIR albedo, but bremen files have apparent albedo only
+        if DataProduct == 'bremen':
+            tropomi_data["albedo"].append(TROPOMI["apparent_albedo"][lat_idx, lon_idx])
+        else:
+            tropomi_data["albedo"].append(TROPOMI["swir_albedo"][lat_idx, lon_idx])
+        
     return tropomi_data
 
 
@@ -118,10 +133,11 @@ def imi_preview(
 
     # Read config file
     config = yaml.load(open(config_path), Loader=yaml.FullLoader)
+    dataProduct = config["DataProduct"]
     for key in config.keys():
         if isinstance(config[key], str):
             config[key] = os.path.expandvars(config[key])
-
+    
     # Open the state vector file
     state_vector = xr.load_dataset(state_vector_path)
     state_vector_labels = state_vector["StateVector"]
@@ -197,7 +213,7 @@ def imi_preview(
     # ----------------------------------
     # Output
     # ----------------------------------
-
+    
     # Write preview diagnostics to text file
     outputtextfile = open(os.path.join(preview_dir, "preview_diagnostics.txt"), "w+")
     outputtextfile.write("##" + outstring6 + "\n")
@@ -216,7 +232,7 @@ def imi_preview(
     ds = df_means.to_xarray()
 
     # Prepare plot data for observation counts
-    df_counts = df.copy(deep=True).drop(["xch4", "swir_albedo"], axis=1)
+    df_counts = df.copy(deep=True).drop(["xch4", "albedo"], axis=1)
     df_counts["counts"] = 1
     df_counts["lat"] = np.round(df_counts["lat"], 1)  # Bin to 0.1x0.1 degrees
     df_counts["lon"] = np.round(df_counts["lon"], 1)
@@ -285,14 +301,14 @@ def imi_preview(
     ax = fig.subplots(1, 1, subplot_kw={"projection": ccrs.PlateCarree()})
     plot_field(
         ax,
-        ds["swir_albedo"],
+        ds["albedo"],
         cmap="magma",
         plot_type="pcolormesh",
         vmin=0,
         vmax=0.4,
         lon_bounds=None,
         lat_bounds=None,
-        title="SWIR Albedo",
+        title="Apparent Albedo" if dataProduct=='bremen' else "SWIR Albedo",
         cbar_label="Albedo",
         mask=mask if config["isRegional"] else None,
         only_ROI=False,
@@ -494,9 +510,9 @@ def estimate_averaging_kernel(
         and int(p.split("____")[1][0:8]) < int(endday)
     ]
     tropomi_paths.sort()
-
-    # Use blended TROPOMI+GOSAT data or operational TROPOMI data?
-    BlendedTROPOMI = config["BlendedTROPOMI"]
+    
+    # Use blended TROPOMI+GOSAT data, operational TROPOMI data, or University of Bremen TROPOMI data?
+    DataProduct = config["DataProduct"]
 
     # Open tropomi files and filter data
     lat = []
@@ -509,7 +525,7 @@ def estimate_averaging_kernel(
     observation_dicts = Parallel(n_jobs=-1)(
         delayed(get_TROPOMI_data)(
             file_path,
-            BlendedTROPOMI,
+            DataProduct,
             xlim,
             ylim,
             startdate_np64,
@@ -525,15 +541,15 @@ def estimate_averaging_kernel(
         lat.extend(obs_dict["lat"])
         lon.extend(obs_dict["lon"])
         xch4.extend(obs_dict["xch4"])
-        albedo.extend(obs_dict["swir_albedo"])
+        albedo.extend(obs_dict["albedo"])
         trtime.extend(obs_dict["time"])
-
+    
     # Assemble in dataframe
     df = pd.DataFrame()
     df["lat"] = lat
     df["lon"] = lon
     df["obs_count"] = np.ones(len(lat))
-    df["swir_albedo"] = albedo
+    df["albedo"] = albedo
     df["xch4"] = xch4
     df["time"] = trtime
 

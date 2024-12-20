@@ -42,7 +42,7 @@ def apply_tropomi_operator_to_one_tropomi_file(filename):
     
     result = apply_tropomi_operator(
         filename = filename,
-        BlendedTROPOMI = blendedTROPOMI,
+        DataProduct = dataProduct,
         n_elements = False, # Not relevant
         gc_startdate = start_time_of_interest,
         gc_enddate = end_time_of_interest,
@@ -209,18 +209,19 @@ def write_bias_corrected_files(bias):
                 for lev in range(original_data.shape[1]):
                     original_data[t, lev, :, :] -= bias_for_this_boundary_condition_file
             ds["SpeciesBC_CH4"].values = original_data
-            if blendedTROPOMI:
-                print(f"Writing to {os.path.join(config['workDir'], 'blended-boundary-conditions', os.path.basename(filename))}")
-                ds.to_netcdf(os.path.join(config["workDir"], "blended-boundary-conditions", os.path.basename(filename)))
-            else:
+            
+            if dataProduct == 'sron':
                 print(f"Writing to {os.path.join(config['workDir'], 'tropomi-boundary-conditions', os.path.basename(filename))}")
                 ds.to_netcdf(os.path.join(config["workDir"], "tropomi-boundary-conditions", os.path.basename(filename)))
+            else:
+                print(f"Writing to {os.path.join(config['workDir'], 'blended-boundary-conditions', os.path.basename(filename))}")
+                ds.to_netcdf(os.path.join(config["workDir"], "blended-boundary-conditions", os.path.basename(filename)))
 
 
 if __name__ == "__main__":
 
     # Arguments from run_boundary_conditions.sh
-    blendedTROPOMI = (sys.argv[1] == "True") # use blended data?
+    dataProduct = sys.argv[1] # which data product?
     satelliteDir = sys.argv[2] # where is the satellite data?
     # Start of GC output (+1 day except 1 Apr 2018 because we ran 1 day extra at the start to account for data not being written at t=0)
     start_time_of_interest = np.datetime64(datetime.datetime.strptime(sys.argv[3], "%Y%m%d"))
@@ -228,7 +229,7 @@ if __name__ == "__main__":
         start_time_of_interest += np.timedelta64(1, "D")
     # End of GC output
     end_time_of_interest = np.datetime64(datetime.datetime.strptime(sys.argv[4], "%Y%m%d"))
-    print(f"\nwrite_boundary_conditions.py output for blendedTROPOMI={blendedTROPOMI}")
+    print(f"\nwrite_boundary_conditions.py output for dataProduct={dataProduct}")
     print(f"Using files at {satelliteDir}")
 
     """

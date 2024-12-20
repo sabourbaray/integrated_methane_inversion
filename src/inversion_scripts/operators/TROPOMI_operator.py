@@ -3,10 +3,12 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import datetime
+
 from shapely.geometry import Polygon
 from utils import (
     filter_tropomi,
     filter_blended,
+    filter_bremen,
     get_strdate,
     check_is_OH_element,
     check_is_BC_element
@@ -22,10 +24,11 @@ from operators.operator_utilities import (
     nearest_loc,
 )
 
+valid_data_product = ['sron', 'blnd', 'bremen']
 
 def apply_average_tropomi_operator(
     filename,
-    BlendedTROPOMI,
+    DataProduct,
     n_elements,
     gc_startdate,
     gc_enddate,
@@ -42,7 +45,7 @@ def apply_average_tropomi_operator(
 
     Arguments
         filename       [str]        : TROPOMI netcdf data file to read
-        BlendedTROPOMI [bool]       : if True, use blended TROPOMI+GOSAT data
+        DataProduct    [str]        : Data product to use; can be sron, blnd, or bremen
         n_elements     [int]        : Number of state vector elements
         gc_startdate   [datetime64] : First day of inversion period, for GEOS-Chem and TROPOMI
         gc_enddate     [datetime64] : Last day of inversion period, for GEOS-Chem and TROPOMI
@@ -64,23 +67,28 @@ def apply_average_tropomi_operator(
                                           If build_jacobian=True, also include:
                                             - K      : Jacobian matrix
     """
-
+    
     # Read TROPOMI data
-    assert isinstance(BlendedTROPOMI, bool), "BlendedTROPOMI is not a bool"
-    if BlendedTROPOMI:
+    assert DataProduct in valid_data_product, f"DataProduct must be one of {valid_data_product}"
+    if DataProduct == 'blnd':
         TROPOMI = read_blended(filename)
-    else:
+    elif DataProduct == 'sron':
         TROPOMI = read_tropomi(filename)
+    elif DataProduct == 'bremen':
+        TROPOMI = read_bremen(filename)
     if TROPOMI == None:
         print(f"Skipping {filename} due to file processing issue.")
         return TROPOMI
 
-    if BlendedTROPOMI:
+    if DataProduct == 'blnd':
         # Only going to consider blended data within lat/lon/time bounds and wihtout problematic coastal pixels
         sat_ind = filter_blended(TROPOMI, xlim, ylim, gc_startdate, gc_enddate, use_water_obs)
-    else:
+    elif DataProduct == 'sron':
         # Only going to consider TROPOMI data within lat/lon/time bounds and with QA > 0.5
         sat_ind = filter_tropomi(TROPOMI, xlim, ylim, gc_startdate, gc_enddate, use_water_obs)
+    else:
+        # Only going to consider TROPOMI data within lat/lon/time bounds and with other filters
+        sat_ind = filter_bremen(TROPOMI, xlim, ylim, gc_startdate, gc_enddate, use_water_obs)
 
     # Number of TROPOMI observations
     n_obs = len(sat_ind[0])
@@ -292,7 +300,7 @@ def apply_average_tropomi_operator(
 
 def apply_tropomi_operator(
     filename,
-    BlendedTROPOMI,
+    DataProduct,
     n_elements,
     gc_startdate,
     gc_enddate,
@@ -309,7 +317,7 @@ def apply_tropomi_operator(
 
     Arguments
         filename       [str]        : TROPOMI netcdf data file to read
-        BlendedTROPOMI [bool]       : if True, use blended TROPOMI+GOSAT data
+        DataProduct    [str]        : Data product to use; can be sron, blnd, or bremen
         n_elements     [int]        : Number of state vector elements
         gc_startdate   [datetime64] : First day of inversion period, for GEOS-Chem and TROPOMI
         gc_enddate     [datetime64] : Last day of inversion period, for GEOS-Chem and TROPOMI
@@ -333,21 +341,26 @@ def apply_tropomi_operator(
     """
 
     # Read TROPOMI data
-    assert isinstance(BlendedTROPOMI, bool), "BlendedTROPOMI is not a bool"
-    if BlendedTROPOMI:
+    assert DataProduct in valid_data_product, f"DataProduct must be one of {valid_data_product}"
+    if DataProduct == 'blnd':
         TROPOMI = read_blended(filename)
-    else:
+    elif DataProduct == 'sron':
         TROPOMI = read_tropomi(filename)
+    elif DataProduct == 'bremen':
+        TROPOMI = read_bremen(filename)
     if TROPOMI == None:
         print(f"Skipping {filename} due to file processing issue.")
         return TROPOMI
 
-    if BlendedTROPOMI:
+    if DataProduct == 'blnd':
         # Only going to consider blended data within lat/lon/time bounds and wihtout problematic coastal pixels
         sat_ind = filter_blended(TROPOMI, xlim, ylim, gc_startdate, gc_enddate, use_water_obs)
-    else:
+    elif DataProduct == 'sron':
         # Only going to consider TROPOMI data within lat/lon/time bounds and with QA > 0.5
         sat_ind = filter_tropomi(TROPOMI, xlim, ylim, gc_startdate, gc_enddate, use_water_obs)
+    else:
+        # Only going to consider TROPOMI data within lat/lon/time bounds and other filters
+        sat_ind = filter_bremen(TROPOMI, xlim, ylim, gc_startdate, gc_enddate, use_water_obs)
 
     # Number of TROPOMI observations
     n_obs = len(sat_ind[0])
@@ -695,7 +708,7 @@ def read_blended(filename):
 
         # Extract data from netCDF file to our dictionary
         with xr.open_dataset(filename) as blended_data:
-
+            
             dat["methane"] = blended_data["methane_mixing_ratio_blended"].values[:]
             dat["longitude"] = blended_data["longitude"].values[:]
             dat["latitude"] = blended_data["latitude"].values[:]
@@ -709,7 +722,7 @@ def read_blended(filename):
             dat["latitude_bounds"] = blended_data["latitude_bounds"].values[:]
             dat["surface_classification"] = (blended_data["surface_classification"].values[:].astype("uint8") & 0x03).astype(int)
             dat["chi_square_SWIR"] = blended_data["chi_square_SWIR"].values[:]
-
+              
             # Remove "Z" from time so that numpy doesn't throw a warning
             utc_str = blended_data["time_utc"].values[:]
             dat["time"] = np.array([d.replace("Z","") for d in utc_str]).astype("datetime64[ns]")
@@ -722,16 +735,77 @@ def read_blended(filename):
             for i in range(12 + 1):
                 pressures[:, i] = surface_pressure - i * pressure_interval
             dat["pressures"] = pressures
-
+        
         # Add an axis here to mimic the (scanline, groundpixel) format of operational TROPOMI data
         # This is so the blended data will be compatible with the TROPOMI operators
         for key in dat.keys():
             dat[key] = np.expand_dims(dat[key], axis=0)
-
+        
     except Exception as e:
         print(f"Error opening {filename}: {e}")
         return None
 
+    return dat
+
+def read_bremen(filename):
+    """
+    Read TROPOMI WFM-DOAS data and save important variables to dictionary.
+
+    Arguments
+        filename [str]  : WFM-DOAS netcdf data file to read
+
+    Returns
+        dat      [dict] : Dictionary of important variables from TROPOMI:
+                            - CH4
+                            - Latitude
+                            - Longitude
+                            - QA value
+                            - Time
+                            - Averaging kernel
+                            - Apparent albedo
+                            - CH4 prior profile
+                            - Latitude bounds
+                            - Longitude bounds
+                            - Vertical pressure profile
+                            - Surface roughness
+                            - Land fraction
+    """
+
+    # Initialize dictionary for TROPOMI data
+    dat = {}
+    
+    try:
+        with xr.open_dataset(filename) as wfmd_data:
+            # Extract data from netCDF file to dictionary
+            # Level dimension ordered from surface to top of atmosphere
+            dat["methane"] = wfmd_data['xch4'].values[:] # ppb
+            dat["longitude"] = wfmd_data['longitude'].values[:]
+            dat["latitude"] = wfmd_data['latitude'].values[:]
+            dat["time"] = wfmd_data['time'].values[:]
+            dat["column_AK"] = wfmd_data["xch4_averaging_kernel"].values[:, :]
+            dat["methane_profile_apriori"] = wfmd_data["ch4_profile_apriori"].values[:, :] # ppb
+            dat["longitude_bounds"] = wfmd_data['longitude_corners'].values[:]
+            dat["latitude_bounds"] = wfmd_data['latitude_corners'].values[:]
+            
+            # Get midpoint of pressure levels to get 20 layers
+            pressure = wfmd_data["pressure_levels"].values[:, :] # hPa
+            dat['pressures'] = (pressure[:,1:] + pressure[:,:-1]) / 2.
+            
+            # Variables for filtering
+            dat["apparent_albedo"] = wfmd_data['apparent_albedo'].values[:]
+            dat["surface_roughness"] = wfmd_data['surface_roughness'].values[:] # meters
+            dat["land_fraction"] = wfmd_data['land_fraction'].values[:] # 0-100%
+            dat["qa_value"] = wfmd_data['xch4_quality_flag'].values[:] # 0 (good) or 1 (bad)
+            
+        # Add an axis here to mimic the (scanline, groundpixel) format of operational TROPOMI data
+        # This is so the bremen data will be compatible with the TROPOMI operators
+        for key in dat.keys():
+            dat[key] = np.expand_dims(dat[key], axis=0)
+    
+    except Exception as err:
+        print(f"Error opening {filename}: {err}")
+        return None
+        
     return dat
 
 def average_tropomi_observations(TROPOMI, gc_lat_lon, sat_ind, time_threshold):

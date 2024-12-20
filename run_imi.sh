@@ -137,7 +137,7 @@ mkdir -p -v ${RunDirs}
 # Set/Collect information about the GEOS-Chem version, IMI version,
 # and TROPOMI processor version
 GEOSCHEM_VERSION=14.4.1
-IMI_VERSION=$(git describe --tags)
+#IMI_VERSION=$(git describe --tags)
 TROPOMI_PROCESSOR_VERSION=$(grep 'VALID_TROPOMI_PROCESSOR_VERSIONS =' src/utilities/download_TROPOMI.py |
     sed 's/VALID_TROPOMI_PROCESSOR_VERSIONS = //' |
     tr -d '"')
@@ -157,10 +157,10 @@ echo "# TROPOMI/blended processor version(s): ${TROPOMI_PROCESSOR_VERSION}" >>"$
 tropomiCache=${RunDirs}/satellite_data
 if "$isAWS"; then
     mkdir -p -v $tropomiCache
-
-    if "$BlendedTROPOMI"; then
+    
+    if [ "$DataProduct" == "blnd" ]; then
         downloadScript=src/utilities/download_blended_TROPOMI.py
-    else
+    elif [ "$DataProduct" == "sron" ]; then
         downloadScript=src/utilities/download_TROPOMI.py
     fi
     sbatch --mem $RequestedMemory \

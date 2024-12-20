@@ -36,7 +36,7 @@ def apply_operator(operator, params, config):
     if operator == "TROPOMI_average":
         return apply_average_tropomi_operator(
             params["filename"],
-            params["BlendedTROPOMI"],
+            params["DataProduct"],
             params["n_elements"],
             params["gc_startdate"],
             params["gc_enddate"],
@@ -51,7 +51,7 @@ def apply_operator(operator, params, config):
     elif operator == "TROPOMI":
         return apply_tropomi_operator(
             params["filename"],
-            params["BlendedTROPOMI"],
+            params["DataProduct"],
             params["n_elements"],
             params["gc_startdate"],
             params["gc_enddate"],
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     latmax = float(sys.argv[7])
     n_elements = int(sys.argv[8])
     tropomi_cache = sys.argv[9]
-    BlendedTROPOMI = sys.argv[10].lower() == "true"
+    DataProduct = str(sys.argv[10])
     use_water_obs = sys.argv[11].lower() == "true"
     isPost = sys.argv[12]
     period_i = int(sys.argv[13])
@@ -153,7 +153,7 @@ if __name__ == "__main__":
                 "TROPOMI_average",
                 {
                     "filename": filename,
-                    "BlendedTROPOMI": BlendedTROPOMI,
+                    "DataProduct": DataProduct,
                     "n_elements": n_elements,
                     "gc_startdate": gc_startdate,
                     "gc_enddate": gc_enddate,
@@ -172,7 +172,7 @@ if __name__ == "__main__":
                 "TROPOMI",
                 {
                     "filename": filename,
-                    "BlendedTROPOMI": BlendedTROPOMI,
+                    "DataProduct": DataProduct,
                     "n_elements": n_elements,
                     "gc_startdate": gc_startdate,
                     "gc_enddate": gc_enddate,

@@ -299,6 +299,7 @@ def merge_pressure_grids(p_sat, p_gc):
 
     Arguments
         p_sat   [float]    : Pressure edges from TROPOMI (13 edges)     <--- 13-1 = 12 pressure layers
+                             For Bremen TROPOMI data, 21 edges          <--- 21-1 = 20 pressure layers
         p_gc    [float]    : Pressure edges from GEOS-Chem (48 edges)   <--- 48-1 = 47 pressure layers
 
     Returns
@@ -388,10 +389,17 @@ def remap(gc_CH4, data_type, p_merge, edge_index, first_gc_edge):
             k = k + 1
     if first_gc_edge > 0:
         CH4[:first_gc_edge] = CH4[first_gc_edge]
+    
+    # Sum up number of levels for TROPOMI pressure levels
+    lev = 0
+    for n in data_type:
+        if n == 1:
+            lev += 1
+    #print("Number of TROPOMI levels: ", lev)
 
     # Calculate the pressure-weighted mean methane for each TROPOMI layer
     delta_p = p_merge[:-1] - p_merge[1:]
-    sat_CH4 = np.zeros(12)
+    sat_CH4 = np.zeros(lev - 1)
     sat_CH4.fill(np.nan)
     for i in range(len(edge_index) - 1):
         start = edge_index[i]
@@ -432,10 +440,17 @@ def remap_sensitivities(sensi_lonlat, data_type, p_merge, edge_index, first_gc_e
     if first_gc_edge > 0:
         deltaCH4[:first_gc_edge, :] = deltaCH4[first_gc_edge, :]
 
+    # Sum up number of levels for TROPOMI pressure levels
+    lev = 0
+    for n in data_type:
+        if n == 1:
+            lev += 1
+    #print("Number of TROPOMI levels: ", lev)
+
     # Calculate the weighted mean DeltaCH4 for each layer, for all perturbed state vector elements
     delta_p = p_merge[:-1] - p_merge[1:]
     delta_ps = np.transpose(np.tile(delta_p, (n_elem, 1)))
-    sat_deltaCH4 = np.zeros((12, n_elem))
+    sat_deltaCH4 = np.zeros((lev - 1, n_elem))
     sat_deltaCH4.fill(np.nan)
     for i in range(len(edge_index) - 1):
         start = edge_index[i]

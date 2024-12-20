@@ -363,6 +363,36 @@ def filter_blended(blended_data, xlim, ylim, startdate, enddate, use_water_obs=F
     else:
         return np.where(valid_idx & (blended_data["surface_classification"] != 1))
 
+def filter_bremen(bremen_data, xlim, ylim, startdate, enddate, use_water_obs=False):
+    """
+    Description:
+        Filter out any data that does not meet the following
+        criteria: We only consider data within lat/lon/time bounds,
+        that don't cross the antimeridian, pixels that have an apparent
+        albedo greater than 0.01, surface roughness less than 100 m, and
+        quality flag of 0 (good).
+        Also, we filter out pixels south of 60S and (optionally) over water.
+    Returns:
+        numpy array with satellite indices for filtered bremen tropomi data.
+    """
+      
+    valid_idx = ((bremen_data["longitude"] > xlim[0])
+              & (bremen_data["longitude"] < xlim[1])
+              & (bremen_data["latitude"] > ylim[0])
+              & (bremen_data["latitude"] < ylim[1])             
+              & (bremen_data["time"] >= startdate)
+              & (bremen_data["time"] <= enddate)
+              & (bremen_data["longitude_bounds"].ptp(axis=2) < 100)  
+              & (bremen_data["apparent_albedo"] >= 0.01) 
+              & (bremen_data["surface_roughness"] <= 100.)
+              & (bremen_data["qa_value"] == 0)
+              & (bremen_data["latitude"] > -60))
+    
+    if use_water_obs:
+        return np.where(valid_idx)
+    else:
+        return np.where(valid_idx & (bremen_data["land_fraction"] > 0))
+
 def calculate_area_in_km(coordinate_list):
     """
     Description:
@@ -496,4 +526,4 @@ def get_period_mean_emissions(prior_cache_path, period, periods_csv_path):
     start_date = str(period_df.loc[0,"Starts"])
     end_date = str(period_df.loc[0,"Ends"])
     return get_mean_emissions(start_date, end_date, prior_cache_path)
-    
+

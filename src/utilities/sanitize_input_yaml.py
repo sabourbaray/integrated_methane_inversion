@@ -28,7 +28,7 @@ config_required = [
     "StartDate",
     "EndDate",
     "SpinupMonths",
-    "BlendedTROPOMI",
+    "DataProduct",
     "isRegional",
     "RegionID",
     "LonMin",
