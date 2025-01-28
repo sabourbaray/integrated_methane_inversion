@@ -15,3 +15,5 @@ slurm-*.out
 backup/*
 configs/*
 modelversions/
+masks/*
+resources/statevectors/*
