@@ -207,8 +207,15 @@ run_posterior() {
     GCsourcepth="${PosteriorRunDir}/OutputDir"
     GCDir="./data_geoschem_posterior"
     printf "\n=== Calling setup_gc_cache.py for posterior ===\n"
-    python ${InversionPath}/src/inversion_scripts/setup_gc_cache.py $StartDate_i $EndDate_i $GCsourcepth $GCDir
-    wait
+    #python ${InversionPath}/src/inversion_scripts/setup_gc_cache.py $StartDate_i $EndDate_i $GCsourcepth $GCDir
+    #wait
+    qsub -l select=1:ncpus=$InversionCPUs:mem=$InversionMemory,walltime=$InversionTime \
+            -W block=true <<-EOF
+                #!/bin/bash
+                cd ${RunDirs}/inversion
+                source activate geo
+                python ${InversionPath}/src/inversion_scripts/setup_gc_cache.py $StartDate_i $EndDate_i $GCsourcepth $GCDir; wait
+EOF
     printf "\n=== DONE -- setup_gc_cache.py ===\n"
 
     # Sample GEOS-Chem atmosphere with TROPOMI
@@ -231,7 +238,7 @@ run_posterior() {
 
     printf "\n=== Calling jacobian.py to sample posterior simulation (without jacobian sensitivity analysis) ===\n"
     #python ${InversionPath}/src/inversion_scripts/jacobian.py ${ConfigPath} $StartDate_i $EndDate_i $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $tropomiCache $BlendedTROPOMI   $UseWaterObs $isPost $kf_period $buildJacobian False; wait
-    qsub -l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
+    qsub -l select=1:ncpus=$InversionCPUs:mem=$InversionMemory,walltime=$InversionTime \
             -W block=true <<-EOF
                 #!/bin/bash
                 cd ${RunDirs}/inversion

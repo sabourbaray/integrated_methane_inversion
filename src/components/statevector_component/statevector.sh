@@ -93,12 +93,15 @@ reduce_dimension() {
         [ ! -f ".aggregation_error.txt" ] || imi_failed $LINENO
     else
         #python "${python_args[@]}"
-        qsub -l select=1:ncpus=$SimulationCPUs:mem=$SimulationMemory,walltime=$RequestedTime \
-                -W block=true \
-                -- "${python_args[@]}"
+        qsub -l select=1:ncpus=$InversionCPUs:mem=$InversionMemory,walltime=$InversionTime \
+                -W block=true <<-EOF
+	            #!/bin/bash
+	            source activate geo
+                export PYTHONPATH=${PYTHONPATH}:${InversionPath}/src/components/statevector_component/
+                python $aggregation_file $InversionPath $ConfigPath $state_vector_path $preview_dir $tropomi_cache
+EOF
         wait
     fi
-
     # archive state vector file if using Kalman filter
     if "$archive_sv"; then
         mkdir -p ${RunDirs}/archive_sv
