@@ -171,10 +171,10 @@ create_simulation_dir() {
     # For all other runs, just disable Restarts
     else
         if "$HourlyCH4"; then
-            #sed -i -e 's/'\''Restart/#'\''Restart/g' HISTORY.rc
+            sed -i -e 's/'\''Restart/#'\''Restart/g' HISTORY.rc
             # Keep Restarts and save monthly to easily resume jacobian runs
-            sed -i "s|Restart.frequency:.*'End'|Restart.frequency:          00000100 000000|g" HISTORY.rc
-            sed -i "s|Restart.duration:.*'End'|Restart.duration:           00000100 000000|g" HISTORY.rc
+            #sed -i "s|Restart.frequency:.*'End'|Restart.frequency:          00000100 000000|g" HISTORY.rc
+            #sed -i "s|Restart.duration:.*'End'|Restart.duration:           00000100 000000|g" HISTORY.rc
         fi
     fi
 
