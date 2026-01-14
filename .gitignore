@@ -17,3 +17,4 @@ configs/*
 modelversions/
 masks/*
 resources/statevectors/*
+fluxlab/*
