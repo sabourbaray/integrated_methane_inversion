@@ -140,7 +140,7 @@ def download_data(start_date, end_date, storage_dir, version):
     print(f"=============Downloading Boundary Conditions {version}=============")
     print(f"Downloading {len(s3_paths)} files - [{start_date},{end_date}].")
     # Download the files using multiple cores
-    with multiprocessing.Pool(112) as pool:
+    with multiprocessing.Pool(int(os.environ.get("IMI_CPUS_PER_TASK", "112"))) as pool:
         pool.map(
             download_from_s3, [(s3_path, bucket, storage_dir) for s3_path in s3_paths]
         )

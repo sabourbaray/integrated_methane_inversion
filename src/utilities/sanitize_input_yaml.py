@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 try:
@@ -31,7 +32,7 @@ Rule = Union[type, List[str], object]  # object == ANY
 config_required: Dict[str, Rule] = {
     "RunName": str,
     "Species": str,
-    "SchedulerType": str,
+    "SchedulerType": ["slurm", "tmux", "PBS"],
     "SafeMode": bool,
     "S3Upload": bool,
     "UseGCHP": bool,
@@ -140,6 +141,11 @@ optional_rules: Dict[str, Rule] = {
     "CreateAutomaticScaleFactorFileOSSE": bool,
     "EmisPerturbationOSSE": float,
     "ScaleFactorFileOSSE": str,
+    "InversionTime": str,
+    "InvSchedulerPartition": str,
+    "PBSModel": str,
+    "PBSAccount": str,
+    "PBSSiteNeeded": str,
     # Other useful optional inputs
     "PointSourceDatasets": ANY,  # list[str]
     "InversionCPUs": int,
@@ -295,6 +301,21 @@ def validate_config(cfg: Dict[str, Any]) -> Tuple[bool, List[str]]:
     for key, rule in optional_rules.items():
         if key in cfg:
             check_key(key, rule, cfg[key])
+
+    if cfg.get("SchedulerType") == "PBS" and cfg.get("UseGCHP") is True:
+        errors.append("PBS currently supports GCClassic only, not GCHP.")
+    for key in ("RequestedCPUs", "InversionCPUs", "NumJacobianTracers"):
+        if key in cfg and type(cfg[key]) is int and cfg[key] < 1:
+            errors.append(f"{key} must be positive.")
+    if type(cfg.get("MaxSimultaneousRuns")) is int and cfg["MaxSimultaneousRuns"] != -1 and cfg["MaxSimultaneousRuns"] < 1:
+        errors.append("MaxSimultaneousRuns must be -1 or positive.")
+
+    for key in ("RequestedTime", "InversionTime"):
+        if key in cfg and not re.fullmatch(r"[0-9]+:[0-5][0-9]:[0-5][0-9]", str(cfg[key])):
+            errors.append(f"{key} must use HHH:MM:SS.")
+    for key in ("RequestedMemory", "InversionMemory"):
+        if key in cfg and not re.fullmatch(r"[1-9][0-9]*([kKmMgGtT][bB]?)?", str(cfg[key])):
+            errors.append(f"{key} must be positive integer memory, optionally kb/mb/gb/tb.")
 
     # 5) Sanity checks
     if (

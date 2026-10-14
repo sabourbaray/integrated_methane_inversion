@@ -10,107 +10,139 @@
 #   - ncmax
 #   - ncmin
 
-# Description: 
-#   Submit a job with default ICI settings using either SBATCH or PBS
-# Usage:
-#   submit_job <SchedulerType> <output_bool> <Memory> <CPUs> <Time> <Partition> <Script> <AdditionalArguments>
-submit_job() {
-    if [[ $1 = "slurm" || $1 = "tmux" ]]; then
-        submit_slurm_job "${@:2}"
-    elif [[ $1 = "PBS" ]]; then
-        submit_pbs_job "${@:2}"
-    else
-        echo "Scheduler type $1 not recognized."
-    fi
-
-    # If output was saved, concatenate it to imi_output
-    if [[ $2 = "true" ]]; then
-        cat imi_output.tmp >> ${InversionPath}/imi_output.log
-        rm imi_output.tmp
-    fi
+# Synchronous single-node GCClassic/Python submission interface.
+# submit_job SCHED SAVE MEM CPUS TIME QUEUE COMMAND [ARG...]
+# submit_python_job SCHED SAVE MEM CPUS TIME QUEUE SCRIPT [ARG...]
+# submit_array_job SCHED SAVE MEM CPUS TIME QUEUE START-END[%LIMIT] COMMAND [ARG...]
+# Artifacts are retained under RunDirs/scheduler; no scientific files are deleted.
+submit_job() { _imi_submit "" "" "$@"; }
+submit_python_job() { _imi_submit "" "${PythonEnvFile:?PythonEnvFile is required}" "$@"; }
+submit_array_job() {
+    local scheduler=$1 save=$2 memory=$3 cpus=$4 walltime=$5 queue=$6 array=$7
+    shift 7
+    _imi_submit "$array" "" "$scheduler" "$save" "$memory" "$cpus" "$walltime" "$queue" "$@"
 }
 
-# Description: 
-#   Submit a job with default ICI settings using SBATCH
-# Usage:
-#   submit_slurm_job $JobArguments
-submit_slurm_job() {
-    if [[ $1 = "true" ]]; then
-        sbatch -N 1 \
-            --mem $2 \
-            -c $3 \
-            -t $4 \
-            -p $5 \
-            -o imi_output.tmp \
-            -W ${@:6}; wait;
-    else
-        sbatch -N 1 \
-            --mem $2 \
-            -c $3 \
-            -t $4 \
-            -p $5 \
-            -W ${@:6}; wait;
-    fi
+# Resource policy for standalone Python stages (not nested inversion commands).
+submit_python_stage() {
+    submit_python_job "$SchedulerType" true "${InversionMemory:-$RequestedMemory}" \
+        "${InversionCPUs:-$RequestedCPUs}" "${InversionTime:-$RequestedTime}" \
+        "${InvSchedulerPartition-$SchedulerPartition}" "$@"
 }
 
-# Description: 
-#   Submit a job with default ICI settings using PBS
-# Usage:
-#   submit_pbs_job $JobArguments
-submit_pbs_job() {
-    # If save output
-    if [[ $1 = "true" ]]; then
-        qsub -lselect=1:ncpus=$3:mem=$2:model=ivy \
-            -l walltime=$4 -q devel -o imi_output.tmp \
-            -Wblock=true -- ${@:6}; wait;
-    else
-        qsub -lselect=1:ncpus=$3:mem=$2:model=ivy \
-            -l walltime=$4 -q devel \
-            -Wblock=true -- ${@:6}; wait;
+_imi_submit() {
+    local array=$1 envfile=$2 scheduler=$3 save=$4 memory=$5 cpus=$6 walltime=$7 queue=$8
+    shift 8
+    local first=0 last=0 limit='' i status=0 rc=0 dir submit_dir root wrapper
+    local -a args command=("$@")
+    case "$scheduler" in slurm|tmux|PBS) ;; *) echo "Unknown scheduler: $scheduler" >&2; return 2;; esac
+    [[ $save == true || $save == false ]] || return 2
+    [[ $cpus =~ ^[1-9][0-9]*$ && $# -gt 0 ]] || return 2
+    [[ $memory =~ ^[1-9][0-9]*([kKmMgGtT][bB]?)?$ ]] || { echo 'Use positive integer memory with optional kb/mb/gb/tb units' >&2; return 2; }
+    [[ $walltime =~ ^[0-9]+:[0-5][0-9]:[0-5][0-9]$ ]] || { echo 'Use walltime HHH:MM:SS' >&2; return 2; }
+    if [[ -n $array ]]; then
+        [[ $array =~ ^([0-9]+)-([0-9]+)(%([1-9][0-9]*))?$ ]] || return 2
+        first=$((10#${BASH_REMATCH[1]})); last=$((10#${BASH_REMATCH[2]})); limit=${BASH_REMATCH[4]}
+        (( last >= first )) || return 2
     fi
-}
-
-convert_sbatch_to_pbs() {
-    DataPaths=($OutputPath $DataPath $DataPathObs $HOME)
-    declare -a SitesNeeded=()
-    for DP in ${DataPaths[@]}; do
-        SitesNeeded_DP=$( find $DP/ -type l -exec realpath {} \; | cut -d/ -f2 | sort -u )
-        for NS in ${SitesNeeded_DP[*]}; do
-            if ! [[ ${SitesNeeded[@]} =~ $NS ]]; then
-                SitesNeeded+=("${NS}+")
-            fi
-        done
-    done
-    SitesNeeded=$(IFS=/ ; echo "${SitesNeeded[*]}")
-    SitesNeeded="/${SitesNeeded::-1}"
-
-    # Get files containing SBATCH
-    current_dir=$(pwd)
-    sbatch_files=($(grep -rl "SBATCH" . --exclude-dir={"GCClassic",".git","*utilities*"}))
-    echo "Replacing SBATCH with PBS in the following files:"
-    for file in ${sbatch_files[@]}; do
-        f=${current_dir}${file:1}
-        echo "    ${f}"
-
-        # First, insert needed sites at the top of every file
-        if ! grep -q "PBS -l site=needed" $file; then
-            awk -i inplace 'FNR==NR{ if (/^##SBATCH/) p=NR; next} 1; FNR==p{ print "##PBS -l site=needed='${SitesNeeded}'" }' ${f} ${f}
-            awk -i inplace 'FNR==NR{ if (/^#SBATCH/) p=NR; next} 1; FNR==p{ print "#PBS -l site=needed='${SitesNeeded}'" }' ${f} ${f}
+    [[ $scheduler != PBS || ${UseGCHP:-false} != true ]] || { echo 'PBS GCHP is not supported' >&2; return 2; }
+    submit_dir=$(pwd -P) || return
+    root=${RunDirs:?RunDirs is required}/scheduler
+    mkdir -p "$root" || return
+    dir=$(mktemp -d "$root/job.XXXXXX") || return
+    dir=$(cd "$dir" && pwd -P) || return
+    wrapper=$dir/job.sh
+    if [[ -n ${ConfigPath:-} && -f $ConfigPath ]]; then
+        cp -- "$ConfigPath" "$dir/config.yml" || return
+    fi
+    # Record exact argv and submission context; no eval or command-string concatenation.
+    printf '%q ' "${command[@]}" > "$dir/command.txt" || return
+    printf '\ncwd=%s\nscheduler=%s\narray=%s\ncpus=%s\nmemory=%s\nwalltime=%s\nqueue=%s\n' \
+        "$submit_dir" "$scheduler" "$array" "$cpus" "$memory" "$walltime" "$queue" > "$dir/request.txt" || return
+    {
+        printf '#!/bin/bash\nset -Ee -o pipefail\n'
+        printf 'job_dir=%q\n' "$dir"
+        if [[ -n $array && $scheduler == PBS && $first == "$last" ]]; then
+            printf 'task=%s\n' "$first"
+        elif [[ -n $array ]]; then
+            case "$scheduler" in
+                PBS) printf 'task=${PBS_ARRAY_INDEX:?Missing PBS array index}\n';;
+                *) printf 'task=${SLURM_ARRAY_TASK_ID:?Missing Slurm array index}\n';;
+            esac
+        else
+            printf 'task=0\n'
         fi
-
-        # Replace SBATCH options
-        sed -i -e "s/SBATCH -J /PBS -N /g" \
-            -e "s/SBATCH -N /PBS -l nodes=/g" \
-            -e "s/SBATCH -c /PBS -l ncpus=/g" \
-            -e "s/SBATCH --mem /PBS -l mem=/g" \
-            -e "s/SBATCH --mem=/PBS -l mem=/g" \
-            -e "s/SBATCH -t /PBS -l walltime=/g" \
-            -e "s/SBATCH -n /PBS -l nodes=1:ppn=/g" \
-            -e "s/SBATCH --ntasks-per-node/PBS -l nodes=1:ppn/g" \
-            -e "s/SBATCH -p /PBS -q /g" \
-            -e "s/SBATCH -o /PBS -o /g" \
-            -e "s/SBATCH --mail-type=END/PBS -m e/g" ${f}
+        cat <<'WORKER'
+[[ $task =~ ^[0-9]+$ ]] || exit 2
+export IMI_ARRAY_TASK_ID=$task
+rm -f "$job_dir/$task.status" "$job_dir/$task.status.part"
+# One status record per task, atomically published after command exit.
+finish() {
+    local rc=$?
+    trap - EXIT
+    printf '%s\n' "$rc" > "$job_dir/$task.status.part"
+    mv "$job_dir/$task.status.part" "$job_dir/$task.status"
+    exit "$rc"
+}
+trap finish EXIT
+exec > "$job_dir/$task.log" 2>&1
+WORKER
+        # Environment files resolve from the repository root, as in run_imi.sh.
+        if [[ -n $envfile ]]; then
+            printf 'cd %q\nsource %q\n' "$InversionPath" "$envfile"
+        fi
+        printf 'cd %q\nexport IMI_CPUS_PER_TASK=%q\n' "$submit_dir" "$cpus"
+        if [[ -n $envfile ]]; then
+            printf 'export LOKY_MAX_CPU_COUNT=%q\nexport OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1\n' "$cpus"
+            printf 'python '
+        fi
+        printf '%q ' "${command[@]}"
+        printf '\n'
+    } > "$wrapper" || return
+    chmod 700 "$wrapper" || return
+    case "$scheduler" in
+        PBS)
+            # Unitless Slurm memory is MiB; PBS unitless memory is bytes.
+            [[ $memory =~ [[:alpha:]] ]] || memory="${memory}mb"
+            case "${memory,,}" in *kb|*mb|*gb|*tb) ;; *) memory="${memory}b";; esac
+            local select="select=1:ncpus=$cpus:mem=${memory,,}"
+            [[ -z ${PBSModel:-} ]] || select+=":model=$PBSModel"
+            args=(-V -S /bin/bash -N imi_job -l "$select" -l "walltime=$walltime" -W block=true -j oe -o "$dir/")
+            [[ -z $queue ]] || args+=(-q "$queue")
+            [[ -z ${PBSAccount:-} ]] || args+=(-A "$PBSAccount")
+            [[ -z ${PBSSiteNeeded:-} ]] || args+=(-l "site=needed=$PBSSiteNeeded")
+            # A one-member logical array can run as an ordinary PBS job.
+            if [[ -n $array ]] && (( first != last )); then
+                args+=(-J "$array")
+            fi
+            qsub "${args[@]}" "$wrapper" > "$dir/submit.stdout" 2> "$dir/submit.stderr" || status=$?
+            ;;
+        *)
+            # Slurm accepts M/G etc.; normalize common PBS-style gb suffixes.
+            memory=${memory^^}; memory=${memory%B}
+            args=(--export=ALL -N 1 --mem "$memory" -c "$cpus" -t "$walltime" -W
+                  -o "$dir/bootstrap-%A_%a.log" -e "$dir/bootstrap-%A_%a.err")
+            [[ -z $queue ]] || args+=(-p "$queue")
+            [[ -z $array ]] || args+=(--array="$array")
+            sbatch "${args[@]}" "$wrapper" > "$dir/submit.stdout" 2> "$dir/submit.stderr" || status=$?
+            ;;
+    esac
+    cat "$dir/submit.stdout" || rc=1
+    cat "$dir/submit.stderr" >&2 || rc=1
+    printf 'IMI submission artifacts: %s\n' "$dir"
+    # Missing/deleted/timed-out members must not be mistaken for success.
+    for ((i=first; i<=last; i++)); do
+        if [[ ! -f $dir/$i.status ]] || [[ $(cat "$dir/$i.status") != 0 ]]; then
+            echo "Task $i failed or has no successful completion record: $dir" >&2
+            rc=1
+        fi
+        if [[ $save == true && -f $dir/$i.log ]]; then
+            cat "$dir/$i.log" >> "${InversionPath:?}/imi_output.log" || rc=1
+        fi
     done
+    # Preserve scheduler status ahead of housekeeping/status-record errors.
+    (( status == 0 )) || return "$status"
+    return "$rc"
 }
 
 # Description: 

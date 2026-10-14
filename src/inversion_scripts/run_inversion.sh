@@ -17,12 +17,13 @@ send_error() {
 rm -f .error_status_file.txt
 
 # trap and exit on errors
+set -Ee -o pipefail
 trap 'send_error $LINENO' ERR
 
 printf "\n=== PARSING CONFIG FILE ===\n"
 
-invPath={INVERSION_PATH}
-configFile={CONFIG_FILE}
+invPath="{INVERSION_PATH}"
+configFile="{CONFIG_FILE}"
 
 # Get configuration
 #  This defines $StartDate, $EndDate, $RunName
@@ -32,14 +33,22 @@ configFile={CONFIG_FILE}
 #   $ObsError, and $Gamma
 #  Make sure $PrecomputedJacobian is true, and then re-run this script
 #   (or run_imi.sh with only the $DoInversion module switched on in config.yml).
-PythonEnv=$(grep '^PythonEnv:' ${invPath}/${configFile} |
+PythonEnv=$(grep '^PythonEnv:' "${configFile}" |
     sed 's/PythonEnv://' |
     sed 's/#.*//' |
     sed 's/^[[:space:]]*//' |
-    tr -d '"')
+    tr -d "\"'")
 echo $PythonEnv
-source ${invPath}/${PythonEnv}
-eval $(python ${invPath}/src/utilities/parse_yaml.py ${invPath}/${configFile})
+if [[ $PythonEnv != /* ]]; then PythonEnv="${invPath}/${PythonEnv}"; fi
+_imi_workdir=$(pwd -P) || exit 1
+cd "$invPath" || exit 1
+source "$PythonEnv" || exit 1
+cd "$_imi_workdir" || exit 1
+export PYTHONPATH="${invPath}:${PYTHONPATH:-}"
+export LOKY_MAX_CPU_COUNT="${IMI_CPUS_PER_TASK:-1}"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+_imi_config=$(python "${invPath}/src/utilities/parse_yaml.py" "$configFile") || exit 1
+eval "$_imi_config"
 
 #=======================================================================
 # Configuration (these settings generated on initial setup)
@@ -101,14 +110,14 @@ if "$LognormalErrors"; then
     GCsourcepth="${BackgroundRunDir}/OutputDir"
     PriorOutputDir="${PriorRunDir}/OutputDir"
     # also need the prior cache so that we can visualize the prior simulation
-    python ${InvDir}/setup_gc_cache.py $StartDate $EndDate $PriorOutputDir $GCVizDir; wait
+    python ${InvDir}/setup_gc_cache.py $StartDate $EndDate $PriorOutputDir $GCVizDir
 else
     # for normal errors we use the prior run
     GCsourcepth="${PriorRunDir}/OutputDir"
 fi
 
 export PYTHONPATH=${PYTHONPATH}:${OutputPath}
-python ${InvDir}/setup_gc_cache.py $StartDate $EndDate $GCsourcepth $GCDir; wait
+python ${InvDir}/setup_gc_cache.py $StartDate $EndDate $GCsourcepth $GCDir
 printf "DONE -- setup_gc_cache.py\n\n"
 
 #=======================================================================
@@ -119,8 +128,8 @@ if "$EnableOSSE"; then
     GCDirOSSE="./data_geoschem_osse"
     mkdir -p  $GCDirOSSE
     # If simulating observations, we need to postprocess the observation data
-    python postproc_diags.py $RunName $RunDirOSSE $PrevDir $StartDate $Res; wait
-    python setup_gc_cache.py $StartDate $EndDate "${RunDirOSSE}/OutputDir" $GCDirOSSE; wait
+    python postproc_diags.py $RunName $RunDirOSSE $PrevDir $StartDate $Res
+    python setup_gc_cache.py $StartDate $EndDate "${RunDirOSSE}/OutputDir" $GCDirOSSE
 fi
 
 #=======================================================================
@@ -128,7 +137,7 @@ fi
 # elements based on specified length scale
 #=======================================================================
 if "$OffDiagonalPriorCov"; then
-    python build_full_prior_covariance.py $StateVectorFile $PriorEmisDir $LengthScalePriorCov $StartDate $EndDate $nBufferClusters; wait
+    python build_full_prior_covariance.py $StateVectorFile $PriorEmisDir $LengthScalePriorCov $StartDate $EndDate $nBufferClusters
 fi
 
 #=======================================================================
@@ -145,11 +154,11 @@ else
     jacobian_sf=${InvDir}/jacobian_scale_factors.npy
 fi
 
-python -u ${InvDir}/jacobian.py ${InvDir} ${invPath}/${configFile} $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $Species $satelliteCache $SatelliteProduct $UseWaterObs $isPost $period_i $buildJacobian False; wait
+python -u ${InvDir}/jacobian.py ${InvDir} "${configFile}" $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $Species $satelliteCache $SatelliteProduct $UseWaterObs $isPost $period_i $buildJacobian False
 if "$LognormalErrors"; then
     # for lognormal error visualization of the prior we sample the prior run
     # without constructing the jacobian matrix
-    python ${InvDir}/jacobian.py ${InvDir} ${invPath}/${configFile} $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $Species $satelliteCache $SatelliteProduct $UseWaterObs $isPost $period_i False True; wait
+    python ${InvDir}/jacobian.py ${InvDir} "${configFile}" $StartDate $EndDate $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $Species $satelliteCache $SatelliteProduct $UseWaterObs $isPost $period_i False True
 fi
 printf " DONE -- jacobian.py\n\n"
 
@@ -162,14 +171,14 @@ if "$LognormalErrors"; then
 
     # then we run the inversion
     printf "Calling lognormal_invert.py\n"
-    python ${InvDir}/lognormal_invert.py ${invPath}/${configFile} $StateVectorFile $jacobian_sf
+    python ${InvDir}/lognormal_invert.py "${configFile}" $StateVectorFile $jacobian_sf
     printf "DONE -- lognormal_invert.py\n\n"
 else
     posteriorSF="./inversion_result.nc"
     python_args=(${InvDir}/invert.py ${OutputPath}/${RunName}/config_${RunName}.yml $nElements $JacobianDir $posteriorSF $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $Res $jacobian_sf $StateVectorFile)
 
     printf "Calling invert.py\n"
-    python "${python_args[@]}"; wait
+    python "${python_args[@]}"
     printf "DONE -- invert.py\n\n"
     #=======================================================================
     # Create gridded posterior scaling factor netcdf file
@@ -177,7 +186,7 @@ else
     GriddedPosterior="./gridded_posterior.nc"
 
     printf "Calling make_gridded_posterior.py\n"
-    python ${InvDir}/make_gridded_posterior.py $posteriorSF $StateVectorFile $GriddedPosterior; wait
+    python ${InvDir}/make_gridded_posterior.py $posteriorSF $StateVectorFile $GriddedPosterior
     printf "DONE -- make_gridded_posterior.py\n\n"
 fi
 

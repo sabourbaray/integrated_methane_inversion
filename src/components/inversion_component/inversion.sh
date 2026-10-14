@@ -95,10 +95,10 @@ run_inversion() {
     InvMem="${InversionMemory:-$RequestedMemory}"
     InvCPU="${InversionCPUs:-$RequestedCPUs}"
     InvTime="${InversionTime:-$RequestedTime}"
-    InvPartition="${InvSchedulerPartition:-$SchedulerPartition}"
+    InvPartition="${InvSchedulerPartition-$SchedulerPartition}"
 
     # Execute inversion driver script
-    submit_job $SchedulerType false $InvMem $InvCPU $InvTime $InvPartition ${InvDir}/run_inversion.sh $FirstSimSwitch
+    submit_job "$SchedulerType" false "$InvMem" "$InvCPU" "$InvTime" "$InvPartition" bash "${InvDir}/run_inversion.sh" "$FirstSimSwitch" || imi_failed "$LINENO" inversion.sh
 
     # check if exited with non-zero exit code
     [ ! -f ".error_status_file.txt" ] || imi_failed $LINENO inversion.sh
@@ -117,6 +117,6 @@ run_notebooks() {
     else
         cd ${RunDirs}/inversion
     fi
-    jupyter nbconvert --execute --to html visualization_notebook.ipynb
+    submit_python_stage -m jupyter nbconvert --execute --to html visualization_notebook.ipynb || imi_failed "$LINENO" inversion.sh
     printf "\n=== DONE RUNNING NOTEBOOKS ===\n"
 }

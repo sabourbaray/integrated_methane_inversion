@@ -28,7 +28,8 @@ is_valid_nc() {
 RUNDIR=$(pwd -P)
 
 ### Get current task ID
-x=${SLURM_ARRAY_TASK_ID}
+x=${IMI_ARRAY_TASK_ID:-${SLURM_ARRAY_TASK_ID:-}}
+[[ $x =~ ^[0-9]+$ ]] || { echo "Missing/invalid IMI array task ID" >&2; exit 2; }
 
 ### Add zeros to the cluster Id
 if [ $x -lt 10 ]; then
@@ -52,7 +53,7 @@ fi
 
 if {ReDoJacobian}; then
 
-    cd ${RUNDIR}/{RunName}_${xstr}
+    cd "${RUNDIR}/{RunName}_${xstr}" || exit 1
 
     # check for last conc file
     # it has 24 timestep
@@ -73,7 +74,7 @@ if {ReDoJacobian}; then
     fi
 else
     ### Run GEOS-Chem in the directory corresponding to the cluster Id
-    cd  ${RUNDIR}/{RunName}_${xstr}
+    cd "${RUNDIR}/{RunName}_${xstr}" || exit 1
     ./{RunName}_${xstr}.run
 
     # save the exit code of the jacobian simulation cmd

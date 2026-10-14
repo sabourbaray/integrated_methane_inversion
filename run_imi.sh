@@ -7,9 +7,12 @@
 #SBATCH -o "imi_output.log"
 #SBATCH --open-mode=append
 
-## Uncomment to use PBS
-###PBS -l nodes=1,ncpus=1
-###PBS -o "imi_output.log"
+# Run this controller from a site-approved persistent orchestration session.
+# Do not put it in a six-hour allocation that must wait for queued child jobs.
+ConfigFile=$(realpath -e -- "${1:-config.yml}") || exit 1
+InversionPath=$(pwd -P) || exit 1
+[[ -f "$InversionPath/src/utilities/common.sh" ]] || { echo "Run from the IMI repository root" >&2; exit 1; }
+ConfigPath=$ConfigFile
 
 # This script will run the Integrated Methane Inversion (IMI) with GEOS-Chem.
 # For documentation, see https://imi.readthedocs.io.
@@ -39,9 +42,11 @@ fi
 # Always copy the current tag into the sentinel file
 echo "$_imi_tag" > "$_imi_sentinel"
 
+exec >> "$InversionPath/imi_output.log" 2>&1
+
 printf "\n================================================================================\n"
 printf "IMI invocation: %s  job=%s  config=%s\n" \
-    "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "${SLURM_JOB_ID:-no-slurm}" "$_imi_tag"
+    "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "${PBS_JOBID:-${SLURM_JOB_ID:-interactive}}" "$_imi_tag"
 printf "================================================================================\n"
 
 unset _imi_cfg _imi_tag _imi_log _imi_sentinel _imi_prev _imi_ts
@@ -63,7 +68,8 @@ source src/components/kalman_component/kalman.sh
 source src/components/osse_component/osse_sim.sh
 
 # trap and exit on errors
-trap 'imi_failed $LINENO' ERR
+set -E
+trap 'imi_failed "$LINENO" "${BASH_SOURCE[0]}"' ERR
 
 start_time=$(date)
 setup_start=$(date +%s)
@@ -74,28 +80,30 @@ setup_start=$(date +%s)
 
 printf "\n=== PARSING CONFIG FILE (run_imi.sh) ===\n"
 
-# Check if user has specified a configuration file
-if [[ $# == 1 ]]; then
-    ConfigFile=$1
-else
-    ConfigFile="config.yml"
-fi
-
 # Get the conda environment name and source file
 # These variables are sourced manually because
 # we need the python environment to parse the yaml file
-PythonEnv=$(grep '^PythonEnv:' ${ConfigFile} |
+PythonEnv=$(grep '^PythonEnv:' "${ConfigPath}" |
     sed 's/PythonEnv://' |
     sed 's/#.*//' |
     sed 's/^[[:space:]]*//' |
-    tr -d '"')
+    tr -d "\"'")
 
 # Load conda/mamba/micromamba and append the current directory to PYTHONPATH
-source $PythonEnv
+PythonEnvFile=$(realpath -e -- "$PythonEnv") || exit 1
+source "$PythonEnvFile" || exit 1
 export PYTHONPATH=${PYTHONPATH}:$(pwd -P)
 
 # Parsing the config file
-eval $(python src/utilities/parse_yaml.py ${ConfigFile})
+python src/utilities/sanitize_input_yaml.py "$ConfigPath" || exit 1
+_imi_config=$(python src/utilities/parse_yaml.py "$ConfigPath") || exit 1
+eval "$_imi_config"
+unset _imi_config
+# Config parsing may replace PythonEnv with its relative spelling; retain absolute path.
+if [[ $SchedulerType == PBS && $UseGCHP == true ]]; then
+    echo "PBS support currently covers GCClassic only; GCHP requires an MPI port." >&2
+    exit 1
+fi
 
 if [[ -z "$GEOSChemEnv" ]]; then
     printf "\nWarning: GEOS-Chem environment not specified in config file.\n"
@@ -108,19 +116,13 @@ else
         exit 1
     else
         printf "\nLoading GEOS-Chem environment: ${GEOSChemEnv}\n"
-            source ${GEOSChemEnv}
+            source "${GEOSChemEnv}"
     fi
 
-    # If scheduler is PBS, get the list of needed sites
-    if [[ "$SchedulerType" = "PBS" ]]; then
-        convert_sbatch_to_pbs
-        sed -i -e "s/SLURM_ARRAY_TASK_ID/PBS_ARRAY_INDEX/g" ${OutputPath}/src/geoschem_run_scripts/run_jacobian_simulations.sh
-        sed -i '/^export OMP_NUM_THREADS=\$SLURM_CPUS_PER_TASK/s/^/# /' ${OutputPath}/src/geoschem_run_scripts/run.template
-    fi
 fi
 
-# Check all necessary config variables are present
-python src/utilities/sanitize_input_yaml.py $ConfigFile || imi_failed
+# Resolve output path before any component changes directory.
+OutputPath=$(realpath -m -- "$OutputPath") || exit 1
 
 # Set path to IMI runs
 RunDirs="${OutputPath}/${RunName}"
@@ -164,7 +166,7 @@ fi
 
 # Path to inversion setup
 InversionPath=$(pwd -P)
-ConfigPath=${InversionPath}/${ConfigFile}
+ConfigPath=$ConfigFile
 
 # add inversion path to python path
 export PYTHONPATH=${PYTHONPATH}:${InversionPath}
@@ -181,7 +183,7 @@ TROPOMI_PROCESSOR_VERSION=$(grep 'VALID_TROPOMI_PROCESSOR_VERSIONS =' src/utilit
     tr -d '"')
 
 # copy config file to run directory and add some run information to it for reference
-cp $ConfigFile "${RunDirs}/config_${RunName}.yml"
+cp "$ConfigFile" "${RunDirs}/config_${RunName}.yml"
 echo ""
 echo "## ================== IMI run information ==================" >>"${RunDirs}/config_${RunName}.yml"
 echo "# Run with IMI version: ${IMI_VERSION}" >>"${RunDirs}/config_${RunName}.yml"
@@ -204,7 +206,7 @@ if [[ -z "$DataPathObs" ]]; then
     else
         printf "$SatelliteProduct is not currently supported for download"
     fi
-    submit_job $SchedulerType true $RequestedMemory $RequestedCPUs $RequestedTime $SchedulerPartition $downloadScript $StartDate $EndDate $satelliteCache
+    submit_python_job "$SchedulerType" true "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" "$downloadScript" "$StartDate" "$EndDate" "$satelliteCache" || imi_failed "$LINENO" run_imi.sh
 else
     # use existing tropomi data and create a symlink to it
     if [[ ! -L $satelliteCache ]]; then
@@ -283,7 +285,7 @@ fi
 
 # copy config file to run directory
 cd $InversionPath
-cp $ConfigFile "${RunDirs}/config_${RunName}.yml"
+cp "$ConfigFile" "${RunDirs}/config_${RunName}.yml"
 
 # Upload output to S3 if specified
 if "$S3Upload"; then
