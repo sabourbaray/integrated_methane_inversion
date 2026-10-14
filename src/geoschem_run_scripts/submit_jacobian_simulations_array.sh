@@ -12,10 +12,13 @@ rm -f .error_status_file.txt
 #--open-mode=append \
 #-W run_jacobian_simulations.sh
 
-qsub -W block=true -J {START}-{END} \
--l select=1:ncpus=$RequestedCPUs:mem=$RequestedMemory,walltime=$RequestedTime \
--o imi_output.tmp \
-./run_jacobian_simulations.sh
+qsub -r y \
+    -W block=true \
+    -J "{START}-{END}{JOBS}" \
+    -l "select=1:ncpus=${RequestedCPUs}:mem=${RequestedMemory}" \
+    -l "walltime=${RequestedTime}" \
+    -o imi_output.tmp \
+    ./run_jacobian_simulations.sh
 
 cat imi_output.tmp >> {InversionPath}/imi_output.log
 rm imi_output.tmp

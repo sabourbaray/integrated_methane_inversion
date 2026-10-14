@@ -2,7 +2,7 @@
 ## Documentation @ https://imi.readthedocs.io/en/latest/getting-started/imi-config-file.html
 
 ## General
-RunName: "Test_Permian_1week"
+RunName: "Test_Permian_1week_U3"
 isAWS: false
 UseSlurm: false
 SafeMode: false
@@ -195,12 +195,12 @@ OutputPath: "/home/rsb001/geoschem/imi_output_dir"
 DataPath: "/home/rsb001/geoschem/ExtData"
 
 ## Path to TROPOMI observations
-DataPathTROPOMI: "/home/rsb001/sitestore/data/tropomi/blnd2018"
+DataPathTROPOMI: "/home/rsb001/site7/data/tropomi/blnd2018"
 
 ## Conda environment file
-CondaFile: "/home/ubuntu/.bashrc"
+CondaFile: "/fs/homeu3/eccc/crd/ccmr/rsb001/.profile.d/rsb/startmamba"
 CondaEnv: "geo"
-GEOSChemEnv: "$GEOSChemEnv"
+GEOSChemEnv: "/fs/homeu3/eccc/crd/ccmr/rsb001/.profile.d/rsb/startgeoschem"
 
 ## Download initial restart file from AWS S3?
 ##  NOTE: Must have AWS CLI enabled

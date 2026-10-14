@@ -109,7 +109,8 @@ fi' runHEMCO.sh
     # Compile HEMCO and store executable in template run directory
     printf "\nCompiling HEMCO...\n"
     cd build
-    source deactivate
+    #source deactivate
+    conda deactivate
     cmake ${InversionPath}/GCClassic/src/HEMCO >>build_hemco.log 2>&1
     cmake . -DRUNDIR=.. >>build_hemco.log 2>&1
     make -j install >>build_hemco.log 2>&1
