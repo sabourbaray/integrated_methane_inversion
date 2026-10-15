@@ -27,8 +27,8 @@ else
     _imi_cfg="config.yml"
 fi
 _imi_tag=$(basename "$_imi_cfg" .yml)
-_imi_log="imi_output.log"
-_imi_sentinel="imi_output.log.tag"
+_imi_log=$(basename "imi_output.log")
+_imi_sentinel=$(basename "imi_output.log.tag")
 
 if [[ -s "$_imi_log" && -f "$_imi_sentinel" ]]; then
     _imi_prev=$(<"$_imi_sentinel")

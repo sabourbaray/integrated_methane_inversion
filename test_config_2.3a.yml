@@ -104,7 +104,7 @@ OptimizeBCs: true
 
 ## Point source datasets
 ## Used for visualizations and state vector clustering
-PointSourceDatasets: ["SRON"]
+PointSourceDatasets: []
 
 ## Clustering Options
 ReducedDimensionStateVector: false
@@ -259,7 +259,7 @@ OutputPath: "/home/rsb001/geoschem/imi_output_dir"
 DataPath: "/home/rsb001/geoschem/ExtData"
 
 ## Path to TROPOMI observations
-DataPathTROPOMI: "/home/rsb001/site7/data/tropomi/blnd2018"
+DataPathObs: "/home/rsb001/site7/data/tropomi/blnd2018"
 
 ## Conda environment file
 PythonEnv: "/home/rsb001/geoschem/imi_v2.3/envs/ECCC/python.env"
