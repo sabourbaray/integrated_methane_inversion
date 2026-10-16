@@ -374,7 +374,7 @@ def controller(config_path, root, stage, range_, directory):
                 try:
                     while True:
                         try:
-                            code = process.wait(timeout=60)
+                            code = process.wait(timeout=600)
                             break
                         except subprocess.TimeoutExpired:
                             summary(runs, stage, log)
