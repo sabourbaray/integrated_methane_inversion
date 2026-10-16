@@ -172,6 +172,10 @@ PBSModel: ""
 PBSAccount: ""
 PBSSiteNeeded: ""
 
+## Cycle long GCClassic simulations through scheduler jobs
+EnableSimulationCycling: true
+SimulationCycleTime: "05:30:00"
+
 ## Max number of simultaneous Jacobian runs from the job array (-1: no limit)
 MaxSimultaneousRuns: -1
 

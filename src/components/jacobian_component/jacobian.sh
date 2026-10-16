@@ -580,7 +580,11 @@ run_jacobian() {
                     -W run_bkgd_simulation.sh
 		wait
             else
-                submit_job "$SchedulerType" false "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash run_bkgd_simulation.sh || imi_failed "$LINENO" jacobian.sh
+                if "${EnableSimulationCycling:-false}"; then
+                    submit_cycling_jobs background "" "${RunDirs}/jacobian_runs/${RunName}_background" || imi_failed "$LINENO" jacobian.sh
+                else
+                    submit_job "$SchedulerType" false "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash run_bkgd_simulation.sh || imi_failed "$LINENO" jacobian.sh
+                fi
             fi
 
             printf "\n=== DONE BACKGROUND SIMULATION ===\n"
@@ -635,7 +639,11 @@ run_jacobian() {
 	    cat imi_output.tmp >>${InversionPath}/imi_output.log
             rm imi_output.tmp
         else
-            submit_job "$SchedulerType" true "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash run_prior_simulation.sh || imi_failed "$LINENO" jacobian.sh
+            if "${EnableSimulationCycling:-false}"; then
+                submit_cycling_jobs prior "" "${RunDirs}/jacobian_runs/${RunName}_0000" || imi_failed "$LINENO" jacobian.sh
+            else
+                submit_job "$SchedulerType" true "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash run_prior_simulation.sh || imi_failed "$LINENO" jacobian.sh
+            fi
         fi
 
         # check if prior simulation exited with non-zero exit code
@@ -657,7 +665,11 @@ run_jacobian() {
                     -W run_bkgd_simulation.sh
 		wait
             else
-		submit_job "$SchedulerType" false "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash run_bkgd_simulation.sh || imi_failed "$LINENO" jacobian.sh
+		if "${EnableSimulationCycling:-false}"; then
+		    submit_cycling_jobs background "" "${RunDirs}/jacobian_runs/${RunName}_background" || imi_failed "$LINENO" jacobian.sh
+		else
+		    submit_job "$SchedulerType" false "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash run_bkgd_simulation.sh || imi_failed "$LINENO" jacobian.sh
+		fi
             fi
             # check if background simulation exited with non-zero exit code
             [ ! -f ".error_status_file.txt" ] || imi_failed $LINENO jacobian.sh

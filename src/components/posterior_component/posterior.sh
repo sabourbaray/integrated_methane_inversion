@@ -234,7 +234,9 @@ run_posterior() {
 
     # Submit job to job scheduler
     printf "\n=== SUBMITTING POSTERIOR SIMULATION ===\n"
-    if "$UseGCHP"; then
+    if "${EnableSimulationCycling:-false}"; then
+        submit_cycling_jobs posterior "" "$PWD" || imi_failed "$LINENO" posterior.sh
+    elif "$UseGCHP"; then
         sbatch --mem $RequestedMemory \
             -N $NUM_NODES \
             -n $TOTAL_CORES \

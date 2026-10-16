@@ -341,6 +341,10 @@ variables can be convenient.
      - Max amount of time to allocate to each sbatch job (eg. "0-6:00")
    * - ``SchedulerPartition``
      - Name of the partition(s) you would like all slurm jobs to run on (eg. "debug"). Partition names will vary depending on the cluster used.
+   * - ``EnableSimulationCycling``
+     - Boolean to cycle long GCClassic CH4 simulations through PBS allocations. Default is ``false``. Requires ``HourlySpecies: true``; Kalman and OSSE modes are not supported. Applies to Jacobian, prior/background, and posterior simulations, not spinup or HEMCO standalone.
+   * - ``SimulationCycleTime``
+     - Time from each batch wrapper's start to its model stop deadline in ``HHH:MM:SS``, default ``"05:30:00"``. Includes environment setup and Python startup. Native PBS arrays have a separate walltime limit for each subjob. Must be at least five minutes below ``RequestedTime`` to leave time for cleanup; allow additional margin for site prologues and slow storage. Each cycle must advance by at least one model day. Completed daily restart files are used for continuation; hourly concentration diagnostics are not restart files.
    * - ``MaxSimultaneousRuns``
      - The maximum number of jacobian simulations to run simultaneously. The default is -1 (no limit) which will submit all jacobian simulations at once. If the value is greater than zero, the sbatch array statement will be modified to include the "%" separator and will limit the number of simultaneously running tasks from the job array to the specifed value.
    * - ``NumJacobianTracers``

@@ -110,6 +110,8 @@ config_required: Dict[str, Rule] = {
 
 # -------------------- OPTIONAL KEYS (validated if present) -------------
 optional_rules: Dict[str, Rule] = {
+    "EnableSimulationCycling": bool,
+    "SimulationCycleTime": str,
     # KalmanMode-related
     "UpdateFreqDays": int,
     "NudgeFactor": float,

@@ -24,6 +24,14 @@ submit_array_job() {
     _imi_submit "$array" "" "$scheduler" "$save" "$memory" "$cpus" "$walltime" "$queue" "$@"
 }
 
+# Description: Cycle long GCClassic simulations through PBS jobs
+# Usage:
+#   submit_cycling_jobs <stage> <array-range> <run-directory>
+submit_cycling_jobs() {
+    python "${InversionPath}/src/utilities/cycle_simulations.py" controller \
+        "$ConfigPath" "$InversionPath" "$1" "$2" "$3"
+}
+
 # Resource policy for standalone Python stages (not nested inversion commands).
 submit_python_stage() {
     submit_python_job "$SchedulerType" true "${InversionMemory:-$RequestedMemory}" \
@@ -62,6 +70,9 @@ _imi_submit() {
         "$submit_dir" "$scheduler" "$array" "$cpus" "$memory" "$walltime" "$queue" > "$dir/request.txt" || return
     {
         printf '#!/bin/bash\nset -Ee -o pipefail\n'
+        if [[ ${IMICycling:-false} == true ]]; then
+            printf 'export IMI_JOB_START_TIME=$(date +%%s.%%N)\n'
+        fi
         printf 'job_dir=%q\n' "$dir"
         if [[ -n $array && $scheduler == PBS && $first == "$last" ]]; then
             printf 'task=%s\n' "$first"

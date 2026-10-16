@@ -120,6 +120,10 @@ fi
 # Check all necessary config variables are present
 python src/utilities/sanitize_input_yaml.py "$ConfigFile" || imi_failed "$LINENO" run_imi.sh
 
+if "${EnableSimulationCycling:-false}"; then
+    python src/utilities/cycle_simulations.py validate "$ConfigFile" || imi_failed "$LINENO" run_imi.sh
+fi
+
 # Set path to IMI runs
 RunDirs="${OutputPath}/${RunName}"
 
