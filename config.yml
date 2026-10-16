@@ -167,12 +167,10 @@ RequestedMemory: "10gb"
 InversionCPUs: 32
 InversionMemory: "32gb"
 RequestedTime: "24:00:00"
-SchedulerPartition: "debug" # Slurm partition or PBS queue; empty uses site default
-# InversionTime: "06:00:00" # falls back to RequestedTime
-# InvSchedulerPartition: "" # omit to inherit SchedulerPartition
-PBSModel: ""              # optional site-specific select property
-PBSAccount: ""            # optional PBS accounting project
-PBSSiteNeeded: ""         # optional explicit NASA filesystem resource; empty at ECCC
+SchedulerPartition: "debug"
+PBSModel: ""
+PBSAccount: ""
+PBSSiteNeeded: ""
 
 ## Max number of simultaneous Jacobian runs from the job array (-1: no limit)
 MaxSimultaneousRuns: -1

@@ -7,13 +7,6 @@
 #SBATCH -o "imi_output.log"
 #SBATCH --open-mode=append
 
-# Run this controller from a site-approved persistent orchestration session.
-# Do not put it in a six-hour allocation that must wait for queued child jobs.
-ConfigFile=$(realpath -e -- "${1:-config.yml}") || exit 1
-InversionPath=$(pwd -P) || exit 1
-[[ -f "$InversionPath/src/utilities/common.sh" ]] || { echo "Run from the IMI repository root" >&2; exit 1; }
-ConfigPath=$ConfigFile
-
 # This script will run the Integrated Methane Inversion (IMI) with GEOS-Chem.
 # For documentation, see https://imi.readthedocs.io.
 #
@@ -27,8 +20,8 @@ else
     _imi_cfg="config.yml"
 fi
 _imi_tag=$(basename "$_imi_cfg" .yml)
-_imi_log=$(basename "imi_output.log")
-_imi_sentinel=$(basename "imi_output.log.tag")
+_imi_log="imi_output.log"
+_imi_sentinel="imi_output.log.tag"
 
 if [[ -s "$_imi_log" && -f "$_imi_sentinel" ]]; then
     _imi_prev=$(<"$_imi_sentinel")
@@ -41,8 +34,6 @@ if [[ -s "$_imi_log" && -f "$_imi_sentinel" ]]; then
 fi
 # Always copy the current tag into the sentinel file
 echo "$_imi_tag" > "$_imi_sentinel"
-
-exec >> "$InversionPath/imi_output.log" 2>&1
 
 printf "\n================================================================================\n"
 printf "IMI invocation: %s  job=%s  config=%s\n" \
@@ -80,26 +71,31 @@ setup_start=$(date +%s)
 
 printf "\n=== PARSING CONFIG FILE (run_imi.sh) ===\n"
 
+# Check if user has specified a configuration file
+if [[ $# == 1 ]]; then
+    ConfigFile=$1
+else
+    ConfigFile="config.yml"
+fi
+
 # Get the conda environment name and source file
 # These variables are sourced manually because
 # we need the python environment to parse the yaml file
-PythonEnv=$(grep '^PythonEnv:' "${ConfigPath}" |
+PythonEnv=$(grep '^PythonEnv:' "${ConfigFile}" |
     sed 's/PythonEnv://' |
     sed 's/#.*//' |
     sed 's/^[[:space:]]*//' |
     tr -d "\"'")
 
 # Load conda/mamba/micromamba and append the current directory to PYTHONPATH
-PythonEnvFile=$(realpath -e -- "$PythonEnv") || exit 1
+PythonEnvFile=$PythonEnv
 source "$PythonEnvFile" || exit 1
 export PYTHONPATH=${PYTHONPATH}:$(pwd -P)
 
 # Parsing the config file
-python src/utilities/sanitize_input_yaml.py "$ConfigPath" || exit 1
-_imi_config=$(python src/utilities/parse_yaml.py "$ConfigPath") || exit 1
+_imi_config=$(python src/utilities/parse_yaml.py "$ConfigFile") || exit 1
 eval "$_imi_config"
 unset _imi_config
-# Config parsing may replace PythonEnv with its relative spelling; retain absolute path.
 if [[ $SchedulerType == PBS && $UseGCHP == true ]]; then
     echo "PBS support currently covers GCClassic only; GCHP requires an MPI port." >&2
     exit 1
@@ -121,8 +117,8 @@ else
 
 fi
 
-# Resolve output path before any component changes directory.
-OutputPath=$(realpath -m -- "$OutputPath") || exit 1
+# Check all necessary config variables are present
+python src/utilities/sanitize_input_yaml.py "$ConfigFile" || imi_failed "$LINENO" run_imi.sh
 
 # Set path to IMI runs
 RunDirs="${OutputPath}/${RunName}"
@@ -166,7 +162,10 @@ fi
 
 # Path to inversion setup
 InversionPath=$(pwd -P)
-ConfigPath=$ConfigFile
+ConfigPath=${InversionPath}/${ConfigFile}
+if [[ $ConfigFile == /* ]]; then
+    ConfigPath=$ConfigFile
+fi
 
 # add inversion path to python path
 export PYTHONPATH=${PYTHONPATH}:${InversionPath}

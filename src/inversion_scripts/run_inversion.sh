@@ -24,6 +24,9 @@ printf "\n=== PARSING CONFIG FILE ===\n"
 
 invPath="{INVERSION_PATH}"
 configFile="{CONFIG_FILE}"
+if [[ $configFile != /* ]]; then
+    configFile="${invPath}/${configFile}"
+fi
 
 # Get configuration
 #  This defines $StartDate, $EndDate, $RunName

@@ -3,8 +3,9 @@
 # Common shell function for the IMI
 # Functions available in this file include:
 #   - submit_job
-#       - submit_slurm_job
-#       - submit_pbs_job
+#   - submit_python_job
+#   - submit_python_stage
+#   - submit_array_job
 #   - print_stats
 #   - imi_failed
 #   - ncmax
@@ -113,7 +114,7 @@ WORKER
             [[ -z ${PBSSiteNeeded:-} ]] || args+=(-l "site=needed=$PBSSiteNeeded")
             # A one-member logical array can run as an ordinary PBS job.
             if [[ -n $array ]] && (( first != last )); then
-                args+=(-J "$array")
+                args+=(-r y -J "$array")
             fi
             qsub "${args[@]}" "$wrapper" > "$dir/submit.stdout" 2> "$dir/submit.stderr" || status=$?
             ;;
