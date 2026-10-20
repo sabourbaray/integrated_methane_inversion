@@ -141,7 +141,7 @@ UseGOOPy: true
 
 ## Setup modules
 ##   Turn on/off different steps in setting up the inversion
-RunSetup: true
+RunSetup: false
 SetupTemplateRundir: true
 SetupSpinupRun: true
 SetupJacobianRuns: true
@@ -150,10 +150,10 @@ SetupPosteriorRun: true
 
 ## Run modules
 ##   Turn on/off different steps in performing the inversion
-DoHemcoPriorEmis: true
-DoSpinup: true
-DoJacobian: true
-ReDoJacobian: true
+DoHemcoPriorEmis: false
+DoSpinup: false
+DoJacobian: false
+ReDoJacobian: false
 DoInversion: true
 DoPosterior: true
 
