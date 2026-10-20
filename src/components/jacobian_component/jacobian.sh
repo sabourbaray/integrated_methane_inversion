@@ -24,7 +24,7 @@ setup_jacobian() {
     if "$isRegional"; then
         mkdir -p jacobian_lowbg_ics_bcs/BCs
         OrigBCFile="${fullBCpath}/GEOSChem.BoundaryConditions.${StartDate}_0000z.nc4"
-        python ${InversionPath}/src/components/jacobian_component/make_jacobian_icbc.py $ConfigPath $OrigBCFile ${RunDirs}/jacobian_lowbg_ics_bcs/BCs $StartDate $Species
+        submit_python_stage "${InversionPath}/src/components/jacobian_component/make_jacobian_icbc.py" "$ConfigPath" "$OrigBCFile" "${RunDirs}/jacobian_lowbg_ics_bcs/BCs" "$StartDate" "$Species" || imi_failed "$LINENO" jacobian.sh
     fi
 
     # create lowbg restart file
@@ -45,7 +45,7 @@ setup_jacobian() {
     else
         OrigRestartFile="${RestartFilePrefix}${StartDate}_0000z.nc4"
     fi
-    python ${InversionPath}/src/components/jacobian_component/make_jacobian_icbc.py $ConfigPath $OrigRestartFile ${RunDirs}/jacobian_lowbg_ics_bcs/Restarts $StartDate $Species
+    submit_python_stage "${InversionPath}/src/components/jacobian_component/make_jacobian_icbc.py" "$ConfigPath" "$OrigRestartFile" "${RunDirs}/jacobian_lowbg_ics_bcs/Restarts" "$StartDate" "$Species" || imi_failed "$LINENO" jacobian.sh
     cd ${RunDirs}/jacobian_lowbg_ics_bcs/Restarts/
     if ! "$UseGCHP"; then
         if [ -f GEOSChem.BoundaryConditions.lowbg.${StartDate}_0000z.nc4 ]; then
@@ -83,8 +83,8 @@ setup_jacobian() {
         -e "s:{InversionPath}:${InversionPath}:g" jacobian_runs/submit_jacobian_simulations_array.sh
     if [ $MaxSimultaneousRuns -gt 0 ]; then
         # Error check
-        if [ $MaxSimultaneousRuns -gt $nRuns ]; then
-            printf "\MaxSimultaneousRuns=${MaxSimultaneousRuns} is greater than the total runs=${nRuns}. Please modify MaxSimultenaousRuns in config.yml"
+        if [ $MaxSimultaneousRuns -gt $((nRuns + 1)) ]; then
+            printf "\MaxSimultaneousRuns=${MaxSimultaneousRuns} is greater than the total runs=$((nRuns + 1)). Please modify MaxSimultenaousRuns in config.yml"
             exit 9999
         fi
         sed -i -e "s:{JOBS}:%${MaxSimultaneousRuns}:g" jacobian_runs/submit_jacobian_simulations_array.sh
@@ -96,7 +96,7 @@ setup_jacobian() {
         jacobian_period=1
         # generate gridded perturbation values for all state vector elements
         printf "\n=== GENERATE GRIDDED PERTURBATION SFs ===\n"
-        python ${InversionPath}/src/components/jacobian_component/make_perturbation_sf.py $ConfigPath $jacobian_period $PerturbValue
+        submit_python_stage "${InversionPath}/src/components/jacobian_component/make_perturbation_sf.py" "$ConfigPath" "$jacobian_period" "$PerturbValue" || imi_failed "$LINENO" jacobian.sh
         printf "\n=== DONE GENERATE GRIDDED PERTURBATION SFs ===\n"
     fi
 
@@ -541,7 +541,7 @@ run_jacobian() {
         jacobian_period=${period_i}
         # generate gridded perturbation values for all state vector elements
         printf "\n=== GENERATE GRIDDED PERTURBATION SFs ===\n"
-        python ${InversionPath}/src/components/jacobian_component/make_perturbation_sf.py $ConfigPath $jacobian_period $PerturbValue
+        submit_python_stage "${InversionPath}/src/components/jacobian_component/make_perturbation_sf.py" "$ConfigPath" "$jacobian_period" "$PerturbValue" || imi_failed "$LINENO" jacobian.sh
         printf "\n=== DONE GENERATE GRIDDED PERTURBATION SFs ===\n"
     else
         jacobian_period=1
@@ -569,14 +569,22 @@ run_jacobian() {
         -e "s:{EndDate}:${completion_end_date}:g" \
         -e "s:{UseGCHP}:${UseGCHP}:g" \
         -e "s:{ReDoJacobian}:${ReDoJacobian}:g" jacobian_runs/run_jacobian_simulations.sh
-    if [[ "$SchedulerType" == "PBS" ]]; then
-        sed -i "/pwd -P/a \
-source ${InversionPath}/${GEOSChemEnv}\\
-cd \${RUNDIR}" jacobian_runs/run_jacobian_simulations.sh
-        sed -i -e "s:\$(pwd -P):${RunDirs}/jacobian_runs:g" jacobian_runs/run_jacobian_simulations.sh
-    fi
-
     popd
+
+    if "$LognormalErrors"; then
+        pushd "${RunDirs}/jacobian_runs"
+        cp ${InversionPath}/src/geoschem_run_scripts/run_bkgd_simulation.sh ./
+        RunDuration=$(get_run_duration "$StartDate" "$EndDate")
+
+        sed -i -e "s:{RunName}:${RunName}:g" \
+            -e "s:{InversionPath}:${InversionPath}:g" \
+            -e "s:{UseGCHP}:${UseGCHP}:g" \
+            -e "s:{StartDate}:${StartDate}:g" \
+            -e "s:{RunDuration}:${RunDuration}:g" \
+            run_bkgd_simulation.sh
+
+        popd
+    fi
 
     if ! "$PrecomputedJacobian"; then
 
@@ -587,22 +595,12 @@ cd \${RUNDIR}" jacobian_runs/run_jacobian_simulations.sh
 
         printf "\n=== SUBMITTING JACOBIAN SIMULATIONS ===\n"
         # Submit job to job scheduler
-        source submit_jacobian_simulations_array.sh
+        source ./submit_jacobian_simulations_array.sh
 
         if "$LognormalErrors"; then
             # Submit background simulation to job scheduler
             printf "\n=== SUBMITTING BACKGROUND SIMULATION ===\n"
 
-            cp ${InversionPath}/src/geoschem_run_scripts/run_bkgd_simulation.sh ./
-            RunDuration=$(get_run_duration "$StartDate" "$EndDate")
-            
-            sed -i -e "s:{RunName}:${RunName}:g" \
-                -e "s:{InversionPath}:${InversionPath}:g" \
-                -e "s:{UseGCHP}:${UseGCHP}:g" \
-                -e "s:{StartDate}:${StartDate}:g" \
-                -e "s:{RunDuration}:${RunDuration}:g" \
-                run_bkgd_simulation.sh
-            
             if "$UseGCHP"; then
                 sbatch --mem $RequestedMemory \
                     -c 1 \
@@ -613,7 +611,11 @@ cd \${RUNDIR}" jacobian_runs/run_jacobian_simulations.sh
                     -W run_bkgd_simulation.sh
 		wait
             else
-                submit_job $SchedulerType false $RequestedMemory $RequestedCPUs $RequestedTime $SchedulerPartition run_bkgd_simulation.sh
+                if "${EnableSimulationCycling:-false}"; then
+                    submit_cycling_jobs background "" "${RunDirs}/jacobian_runs/${RunName}_background" || imi_failed "$LINENO" jacobian.sh
+                else
+                    submit_job "$SchedulerType" false "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash run_bkgd_simulation.sh || imi_failed "$LINENO" jacobian.sh
+                fi
             fi
 
             printf "\n=== DONE BACKGROUND SIMULATION ===\n"
@@ -643,6 +645,8 @@ cd \${RUNDIR}" jacobian_runs/run_jacobian_simulations.sh
         JacobianRunsDir=${RunDirs}/jacobian_runs
         cd ${JacobianRunsDir}
 
+        rm -f .error_status_file.txt
+
         # Submit prior simulation to job scheduler
         printf "\n=== SUBMITTING PRIOR SIMULATION ===\n"
         cp ${InversionPath}/src/geoschem_run_scripts/run_prior_simulation.sh ./
@@ -666,7 +670,11 @@ cd \${RUNDIR}" jacobian_runs/run_jacobian_simulations.sh
 	    cat imi_output.tmp >>${InversionPath}/imi_output.log
             rm imi_output.tmp
         else
-            submit_job $SchedulerType true $RequestedMemory $RequestedCPUs $RequestedTime $SchedulerPartition run_prior_simulation.sh
+            if "${EnableSimulationCycling:-false}"; then
+                submit_cycling_jobs prior "" "${RunDirs}/jacobian_runs/${RunName}_0000" || imi_failed "$LINENO" jacobian.sh
+            else
+                submit_job "$SchedulerType" true "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash run_prior_simulation.sh || imi_failed "$LINENO" jacobian.sh
+            fi
         fi
 
         # check if prior simulation exited with non-zero exit code
@@ -688,7 +696,11 @@ cd \${RUNDIR}" jacobian_runs/run_jacobian_simulations.sh
                     -W run_bkgd_simulation.sh
 		wait
             else
-		submit_job $SchedulerType false $RequestedMemory $RequestedCPUs $RequestedTime $SchedulerPartition run_bkgd_simulation.sh
+		if "${EnableSimulationCycling:-false}"; then
+		    submit_cycling_jobs background "" "${RunDirs}/jacobian_runs/${RunName}_background" || imi_failed "$LINENO" jacobian.sh
+		else
+		    submit_job "$SchedulerType" false "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash run_bkgd_simulation.sh || imi_failed "$LINENO" jacobian.sh
+		fi
             fi
             # check if background simulation exited with non-zero exit code
             [ ! -f ".error_status_file.txt" ] || imi_failed $LINENO jacobian.sh
@@ -696,7 +708,7 @@ cd \${RUNDIR}" jacobian_runs/run_jacobian_simulations.sh
         fi
 
         # Get Jacobian scale factors
-        python ${InversionPath}/src/inversion_scripts/get_jacobian_scalefactors.py $jacobian_period $RunDirs $ReferenceRunDir $KalmanMode
+        submit_python_stage "${InversionPath}/src/inversion_scripts/get_jacobian_scalefactors.py" "$jacobian_period" "$RunDirs" "$ReferenceRunDir" "$KalmanMode" || imi_failed "$LINENO" jacobian.sh
         wait
         printf "Got Jacobian scale factors\n"
     fi

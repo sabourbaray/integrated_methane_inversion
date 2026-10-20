@@ -103,19 +103,6 @@ setup_spinup() {
         rm -f run.template
     fi
 
-    # If PBS, we need to re-source the environment and cd into the directory
-    # (unlike the Harvard cluster, these variables are not remembered when a new
-    # job is submitted)
-    if [[ "$SchedulerType" == "PBS" ]]; then
-        sed -i "/#PBS -m/a \
-source ${InversionPath}/${GEOSChemEnv}\\
-cd ${RunDirs}/${runDir}/
-" ${SpinupName}.run
-
-	# Convert residual SBATCH commands to PBS
-	convert_sbatch_to_pbs
-    fi
-    
     ### Perform dry run if requested
     if [ "$UseGCHP" != "true" ]; then
         if "$SpinupDryrun"; then
@@ -152,7 +139,7 @@ run_spinup() {
             -W ${RunName}_Spinup.run
 	wait
     else
-	submit_job $SchedulerType false $RequestedMemory $RequestedCPUs $RequestedTime $SchedulerPartition ${RunDirs}/spinup_run/${RunName}_Spinup.run
+	submit_job "$SchedulerType" false "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash "${RunDirs}/spinup_run/${RunName}_Spinup.run" || imi_failed "$LINENO" spinup.sh
     fi
 
     # check if exited with non-zero exit code

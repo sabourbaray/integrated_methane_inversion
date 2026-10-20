@@ -41,7 +41,7 @@ setup_imi() {
             START=${StartDate}
         fi
         printf "\nDownloading boundary condition data for $START to $EndDate\n"
-        python src/utilities/download_bc.py ${START} ${EndDate} ${fullBCpath} ${BCversion}
+        submit_python_stage src/utilities/download_bc.py "${START}" "${EndDate}" "${fullBCpath}" "${BCversion}" || imi_failed "$LINENO" setup.sh
 
     fi
 
@@ -51,7 +51,7 @@ setup_imi() {
     if "$RestartDownload"; then
         RestartFile=${RestartFilePrefix}${SpinupStart}_0000z.nc4
         if [ ! -f "$RestartFile" ]; then
-            python src/utilities/download_aws_file.py s3://imi-boundary-conditions/${BCversion}/GEOSChem.BoundaryConditions.${SpinupStart}_0000z.nc4 $RestartFile
+            submit_python_stage src/utilities/download_aws_file.py s3://imi-boundary-conditions/"${BCversion}/GEOSChem.BoundaryConditions.${SpinupStart}_0000z.nc4" "$RestartFile" || imi_failed "$LINENO" setup.sh
         fi
     fi
 

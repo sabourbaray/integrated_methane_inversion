@@ -20,7 +20,7 @@ if test -f "$FILE"; then
 fi
 
 ### Run GEOS-Chem in the directory corresponding to the cluster Id
-cd  ${RUNDIR}/{RunName}_${xstr}
+cd "${RUNDIR}/{RunName}_${xstr}" || exit 1
 if {UseGCHP}; then
     ./cleanRunDir.sh
     echo "{StartDate} 000000" > cap_restart

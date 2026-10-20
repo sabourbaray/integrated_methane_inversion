@@ -340,9 +340,23 @@ variables can be convenient.
    * - ``InversionMemory``
      - Optional Variable. Amount of memory to allocate to inversion sbatch job (e.g. "32gb") if different from ``RequestedMemory``.
    * - ``RequestedTime``
-     - Max amount of time to allocate to each sbatch job (eg. "0-6:00")
+     - Maximum time per scheduler job. Use ``HHH:MM:SS`` for PBS; Slurm time formats such as ``0-6:00`` are also accepted for Slurm.
    * - ``SchedulerPartition``
-     - Name of the partition(s) you would like all slurm jobs to run on (eg. "debug"). Partition names will vary depending on the cluster used.
+     - Slurm partition or PBS queue. An empty string uses the scheduler default.
+   * - ``InversionTime``
+     - Optional time limit for inversion and standalone Python jobs. Defaults to ``RequestedTime``.
+   * - ``InvSchedulerPartition``
+     - Optional partition or queue for inversion and standalone Python jobs. Defaults to ``SchedulerPartition``.
+   * - ``PBSModel``
+     - Optional PBS ``select`` model property. Empty by default.
+   * - ``PBSAccount``
+     - Optional PBS accounting project. Empty by default.
+   * - ``PBSSiteNeeded``
+     - Optional site-specific PBS filesystem resource. Empty by default; not required at ECCC.
+   * - ``EnableSimulationCycling``
+     - Boolean to cycle long GCClassic CH4 simulations through PBS allocations. Default is ``false``. Requires ``HourlySpecies: true``; Kalman and OSSE modes are not supported. Applies to Jacobian, prior/background, and posterior simulations, not spinup or HEMCO standalone.
+   * - ``SimulationCycleTime``
+     - Time from each batch wrapper's start to its model stop deadline in ``HHH:MM:SS``, default ``"05:30:00"``. Includes environment setup and Python startup. Native PBS arrays have a separate walltime limit for each subjob. Must be at least five minutes below ``RequestedTime`` to leave time for cleanup; allow additional margin for site prologues and slow storage. Each cycle must advance by at least one model day. Completed daily restart files are used for continuation; hourly concentration diagnostics are not restart files.
    * - ``MaxSimultaneousRuns``
      - The maximum number of jacobian simulations to run simultaneously. The default is -1 (no limit) which will submit all jacobian simulations at once. If the value is greater than zero, the sbatch array statement will be modified to include the "%" separator and will limit the number of simultaneously running tasks from the job array to the specifed value.
    * - ``NumJacobianTracers``
@@ -350,6 +364,20 @@ variables can be convenient.
        will create and submit a jacobian run for each state vector element. 
        Specifying a value greater than 1 will combine state vector elements 
        into fewer runs. The default values is 5 tracers per simulation.
+
+   * - ``EnableSensitivityCycling``
+     - Resume ``jacobian.py`` observation processing across PBS allocations. Default is ``false``. Requires GCClassic CH4 and non-Kalman/non-OSSE mode. Preparation and the inversion solve run in separate jobs. Completed observation files are retained; interrupted files are recomputed. GOOPy and the native IMI operator are supported.
+   * - ``SensitivityCycleTime``
+     - Time from batch wrapper start to the observation-processing stop deadline, in ``HHH:MM:SS``. Default is ``"05:30:00"``. Must be at least five minutes below ``InversionTime`` (or ``RequestedTime`` when omitted). Each interrupted cycle must complete at least one additional observation file.
+
+Scheduler logs are stored under ``<OutputPath>/<RunName>/scheduler/<component>``
+with sequential job numbers. Each submission retains its wrapper, submission
+log, task logs, and a combined exit-status table. Model restart archives remain
+in each simulation's ``.imi_cycles`` directory. Cycling progress is printed
+every 600 seconds and after each submission, and appended to ``imi_output.log``.
+An unexpected scheduler failure or missing completion record stops the workflow;
+reconcile the old jobs before retrying. Do not run two controllers on the same
+output tree.
 
 Advanced settings: Observing System Simulation Experiment (OSSE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

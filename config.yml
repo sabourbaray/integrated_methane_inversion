@@ -163,13 +163,24 @@ DoPosterior: false
 DoPreview: true
 DOFSThreshold: 0
 
-## Resource allocation settings for slurm jobs
+## Resource allocation settings for scheduler jobs
 RequestedCPUs: 8
 RequestedMemory: "10gb"
 InversionCPUs: 32
 InversionMemory: "32gb"
 RequestedTime: "24:00:00"
 SchedulerPartition: "debug"
+PBSModel: ""
+PBSAccount: ""
+PBSSiteNeeded: ""
+
+## Cycle long GCClassic simulations through scheduler jobs
+EnableSimulationCycling: false
+SimulationCycleTime: "05:30:00"
+
+## Cycle observation processing through scheduler jobs
+EnableSensitivityCycling: false
+SensitivityCycleTime: "05:30:00"
 
 ## Max number of simultaneous Jacobian runs from the job array (-1: no limit)
 MaxSimultaneousRuns: -1

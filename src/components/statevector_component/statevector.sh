@@ -59,7 +59,7 @@ create_statevector() {
     chmod 755 make_state_vector_file.py
 
     printf "\nCalling make_state_vector_file.py\n"
-    python make_state_vector_file.py $ConfigPath $LandCoverFile $HemcoDiagFile $StateVectorFName
+    submit_python_stage ./make_state_vector_file.py "$ConfigPath" "$LandCoverFile" "$HemcoDiagFile" "$StateVectorFName" || imi_failed "$LINENO" statevector.sh
 
     if "$UseGCHP"; then
         if "$STRETCH_GRID"; then
@@ -104,7 +104,7 @@ reduce_dimension() {
     fi
 
     # conditionally add period_i to python args
-    python_args=($aggregation_file $ConfigPath $state_vector_path $preview_dir $satellite_cache)
+    python_args=("$aggregation_file" "$ConfigPath" "$state_vector_path" "$preview_dir" "$satellite_cache")
     archive_sv=false
     if ("$KalmanMode" && "$DynamicKFClustering"); then
         if [ -n "$period_i" ]; then
@@ -113,17 +113,9 @@ reduce_dimension() {
         fi
     fi
 
-    # if running end to end script with sbatch then use
-    # sbatch to take advantage of multiple cores 
-    if [[ "$SchedulerType" = "slurm" || "$SchedulerType" = "PBS" ]]; then
-        rm -f .aggregation_error.txt
-        chmod +x $aggregation_file
-        submit_job $SchedulerType true $RequestedMemory $RequestedCPUs $RequestedTime $SchedulerPartition "${python_args[@]}"
-        # check for any errors
-        [ ! -f ".aggregation_error.txt" ] || imi_failed $LINENO statevector.sh
-    else
-        python "${python_args[@]}"
-    fi
+    rm -f .aggregation_error.txt
+    submit_python_stage "${python_args[@]}" || imi_failed "$LINENO" statevector.sh
+    [ ! -f .aggregation_error.txt ] || imi_failed "$LINENO" statevector.sh
 
     # archive state vector file if using Kalman filter
     if "$archive_sv"; then

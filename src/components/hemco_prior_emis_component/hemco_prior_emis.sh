@@ -89,18 +89,6 @@ run_hemco_prior_emis() {
     sed -i -e "/#SBATCH -t 0-12:00/d" runHEMCO.sh
     sed -i -e "/#SBATCH -p sapphire/d" runHEMCO.sh
     sed -i -e "/#SBATCH --mem=15000/d" runHEMCO.sh
-    # If PBS, we need to re-source the environment and cd into the directory
-    # (unlike the Harvard cluster, these variables are not remembered when a new
-    # job is submitted)
-    if [[ "$SchedulerType" == "PBS" ]]; then
-        sed -i "/#PBS -l site=needed=/a\\
-source ${InversionPath}/${GEOSChemEnv}\\
-cd ${RunDirs}/${HEMCOdir}
-" runHEMCO.sh
-
-	# Convert residual SBATCH commands to PBS
-	convert_sbatch_to_pbs
-    fi
     sed -i '/.*hemco_standalone.*/a\
 retVal=$?\
 if [ $retVal -ne 0 ]; then\
@@ -109,6 +97,8 @@ if [ $retVal -ne 0 ]; then\
     echo "HEMCO prior emis run exited with error code: $retVal"\
     exit $retVal\
 fi' runHEMCO.sh
+
+    sed -i 's/^export OMP_NUM_THREADS=.*/export OMP_NUM_THREADS="${IMI_CPUS_PER_TASK:-${SLURM_CPUS_PER_TASK:-1}}"/' runHEMCO.sh
 
     sa_XMIN=$(python ${InversionPath}/src/components/hemco_prior_emis_component/get_hemco_grid_vars.py ${RunDirs}/StateVector.nc XMIN)
     sa_XMAX=$(python ${InversionPath}/src/components/hemco_prior_emis_component/get_hemco_grid_vars.py ${RunDirs}/StateVector.nc XMAX)
@@ -172,7 +162,7 @@ run_hemco_sa() {
     rm -f .error_status_file.txt
     
     # Submit job to job scheduler
-    submit_job $SchedulerType true $RequestedMemory $RequestedCPUs $RequestedTime $SchedulerPartition ${RunDirs}/${HEMCOdir}/${RunName}_HEMCO_Prior_Emis.run
+    submit_job "$SchedulerType" true "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash "${RunDirs}/${HEMCOdir}/${RunName}_HEMCO_Prior_Emis.run" || imi_failed "$LINENO" hemco_prior_emis.sh
 
     # check if exited with non-zero exit code
     [ ! -f ".error_status_file.txt" ] || imi_failed $LINENO hemco_prior_emis.sh

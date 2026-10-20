@@ -8,6 +8,8 @@ import re
 import os
 import datetime
 import gc
+from pathlib import Path
+from src.utilities import sensitivity_progress
 from src.inversion_scripts.utils import save_obj
 from src.utilities.config_utils import load_config
 from src.inversion_scripts.operators.satellite_operator import (
@@ -208,18 +210,50 @@ if __name__ == "__main__":
     sat_files.sort()
     print("Found", len(sat_files), "satellite data files.")
 
+    progress_path = os.environ.get("IMI_SENSITIVITY_STATE")
+    completed = set()
+    if progress_path:
+        if not Path(progress_path).exists() and any(Path(outputdir).glob("*.pkl")):
+            raise ValueError("Existing observation output has no cycling records; use a fresh inversion directory")
+        source_root = Path(sensitivity_progress.__file__).resolve().parents[2]
+        sources = list((source_root / "src/inversion_scripts").rglob("*.py"))
+        sources += list((source_root / "GOOPy").rglob("*.py"))
+        sources += [Path(__file__), Path(sensitivity_progress.__file__),
+                    source_root / "GOOPy/config.yaml"]
+        code = {str(path): sensitivity_progress.digest(path) for path in sources if path.is_file()}
+        run_root = Path(config["OutputPath"]) / config["RunName"]
+        for path in (run_root / "StateVector.nc",
+                     run_root / "archive_perturbation_sfs" / f"pert_sf_{period_i}.npz"):
+            if path.is_file():
+                code[str(path)] = sensitivity_progress.digest(path)
+        model_files = list(Path(gc_cache).glob("*.nc4"))
+        model_files += list((run_root / "jacobian_runs").glob("*/OutputDir/*.nc4"))
+        code["model_files"] = {str(path): [path.stat().st_size, path.stat().st_mtime_ns]
+                               for path in model_files}
+        completed = sensitivity_progress.initialize(
+            progress_path, sat_files, sys.argv[1:], config, code
+        )
+
     # Map GEOS-Chem to satellite observation space
     # Also return Jacobian matrix if build_jacobian=True
     def process(filename):
+
+        if progress_path and str(Path(filename).absolute()) in completed:
+            return 0
 
         # Check if satellite file has already been processed
         print("========================")
         shortname = re.split(r"\/", filename)[-1]
         print(shortname)
         date = re.split(r"\.", shortname)[0]
+        if progress_path:
+            for folder in (outputdir, vizdir):
+                output_path = Path(folder) / f"{date}_GCtoSatellite.pkl"
+                output_path.unlink(missing_ok=True)
+                output_path.with_suffix(".pkl.part").unlink(missing_ok=True)
 
         # If not yet processed, run apply_average_satellite_operator()
-        if not os.path.isfile(f"{outputdir}/{date}_GCtoSatellite.pkl"):
+        if progress_path or not os.path.isfile(f"{outputdir}/{date}_GCtoSatellite.pkl"):
             print("Applying satellite operator...")
 
             # Compute super-observations for this satellite file
@@ -238,6 +272,8 @@ if __name__ == "__main__":
                 use_water_obs=use_water_obs,
             )
             if superobservations_output is None:
+                if progress_path:
+                    sensitivity_progress.record(progress_path, filename)
                 return 0
             obs_mapped_to_gc, output_dir = superobservations_output
 
@@ -298,14 +334,25 @@ if __name__ == "__main__":
                 )
 
             if output is None:
+                if progress_path:
+                    sensitivity_progress.record(progress_path, filename)
                 return 0
         else:
             return 0
 
         if output["obs_GC"].shape[0] > 0:
             print("Saving .pkl file")
-            save_obj(output, f"{outputdir}/{date}_GCtoSatellite.pkl")
-            save_obj(viz_output, f"{vizdir}/{date}_GCtoSatellite.pkl")
+            output_path = f"{outputdir}/{date}_GCtoSatellite.pkl"
+            viz_path = f"{vizdir}/{date}_GCtoSatellite.pkl"
+            if progress_path:
+                sensitivity_progress.save_pair(output, viz_output, output_path, viz_path,
+                                               n_elements, build_jacobian)
+                sensitivity_progress.record(progress_path, filename, (output_path, viz_path))
+            else:
+                save_obj(output, output_path)
+                save_obj(viz_output, viz_path)
+        elif progress_path:
+            sensitivity_progress.record(progress_path, filename)
 
         #Clean up to reduce memory use
         del output, viz_output

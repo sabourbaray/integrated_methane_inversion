@@ -234,7 +234,9 @@ run_posterior() {
 
     # Submit job to job scheduler
     printf "\n=== SUBMITTING POSTERIOR SIMULATION ===\n"
-    if "$UseGCHP"; then
+    if "${EnableSimulationCycling:-false}"; then
+        submit_cycling_jobs posterior "" "$PWD" || imi_failed "$LINENO" posterior.sh
+    elif "$UseGCHP"; then
         sbatch --mem $RequestedMemory \
             -N $NUM_NODES \
             -n $TOTAL_CORES \
@@ -243,7 +245,7 @@ run_posterior() {
             -W ${RunName}_Posterior.run
 	wait
     else
-	submit_job $SchedulerType false $RequestedMemory $RequestedCPUs $RequestedTime $SchedulerPartition ${RunName}_Posterior.run
+	submit_job "$SchedulerType" false "$RequestedMemory" "$RequestedCPUs" "$RequestedTime" "$SchedulerPartition" bash "${RunName}"_Posterior.run || imi_failed "$LINENO" posterior.sh
     fi
 
     # check if exited with non-zero exit code
@@ -267,8 +269,7 @@ run_posterior() {
     GCsourcepth="${PosteriorRunDir}/OutputDir"
     GCDir="./data_geoschem_posterior"
     printf "\n=== Calling setup_gc_cache.py for posterior ===\n"
-    python ${InversionPath}/src/inversion_scripts/setup_gc_cache.py $StartDate_i $EndDate_i $GCsourcepth $GCDir
-    wait
+    submit_python_stage "${InversionPath}/src/inversion_scripts/setup_gc_cache.py" "$StartDate_i" "$EndDate_i" "$GCsourcepth" "$GCDir" || imi_failed "$LINENO" posterior.sh
     printf "\n=== DONE -- setup_gc_cache.py ===\n"
 
     # Sample GEOS-Chem atmosphere with satellite
@@ -296,8 +297,7 @@ run_posterior() {
     kf_period=1
 
     printf "\n=== Calling jacobian.py to sample posterior simulation (without jacobian sensitivity analysis) ===\n"
-    python ${InversionPath}/src/inversion_scripts/jacobian.py ${InvDir} ${ConfigPath} $StartDate_i $EndDate_i $LonMinInvDomain $LonMaxInvDomain $LatMinInvDomain $LatMaxInvDomain $nElements $satelliteCache $isPost $kf_period $buildJacobian False
-    wait
+    submit_python_stage "${InversionPath}/src/inversion_scripts/jacobian.py" "${InvDir}" "${ConfigPath}" "$StartDate_i" "$EndDate_i" "$LonMinInvDomain" "$LonMaxInvDomain" "$LatMinInvDomain" "$LatMaxInvDomain" "$nElements" "$satelliteCache" "$isPost" "$kf_period" "$buildJacobian" False || imi_failed "$LINENO" posterior.sh
     printf "\n=== DONE sampling the posterior simulation ===\n\n"
     posterior_end=$(date +%s)
 

@@ -282,6 +282,10 @@ def goopy_apply_operator(
     
     # Update LOCAL_SETTINGS with the values needed for this run
     save_dir = f'{gc_cache}/../goopy_output'
+    if os.environ.get("IMI_SENSITIVITY_STATE"):
+        save_dir = os.path.join(save_dir, os.path.basename(gc_cache), operator)
+        goopy_config['LOCAL_SETTINGS']['REPROCESS'] = 'True'
+        goopy_config['LOCAL_SETTINGS']['N_THREADS'] = 1
     if operator == "satellite_average":
         goopy_obs_file = superobs_file_path(filename, satellite_cache)
         if not os.path.isfile(goopy_obs_file):

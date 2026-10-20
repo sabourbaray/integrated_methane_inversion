@@ -133,7 +133,7 @@ run_period() {
 
     # Prepare initial (prior) emission scale factors for the current period
     echo "python path = $PYTHONPATH"
-    python ${InversionPath}/src/components/kalman_component/prepare_sf.py $ConfigPath $period_i ${RunDirs} $NudgeFactor $Species; wait
+    submit_python_stage "${InversionPath}/src/components/kalman_component/prepare_sf.py" "$ConfigPath" "$period_i" "${RunDirs}" "$NudgeFactor" "$Species" || imi_failed "$LINENO" kalman.sh
 
     # Dynamically generate state vector for each period
     if ("$ReducedDimensionStateVector" && "$DynamicKFClustering"); then
@@ -170,12 +170,12 @@ run_period() {
 
     # Update ScaleFactor.nc with the new posterior scale factors before running the posterior simulation
     # NOTE: This also creates the posterior_sf_period{i}.nc file in archive_sf/
-    python ${InversionPath}/src/components/kalman_component/multiply_posteriors.py $ConfigPath $period_i ${RunDirs} $LognormalErrors
+    submit_python_stage "${InversionPath}/src/components/kalman_component/multiply_posteriors.py" "$ConfigPath" "$period_i" "${RunDirs}" "$LognormalErrors" || imi_failed "$LINENO" kalman.sh
     wait
     echo "Multiplied posterior scale factors over record"
 
     # Print total posterior emissions
-    python ${InversionPath}/src/components/kalman_component/print_posterior_emissions.py $ConfigPath $period_i ${RunDirs}
+    submit_python_stage "${InversionPath}/src/components/kalman_component/print_posterior_emissions.py" "$ConfigPath" "$period_i" "${RunDirs}" || imi_failed "$LINENO" kalman.sh
     wait
 
     run_posterior
@@ -187,7 +187,7 @@ run_period() {
     else
         org_restart=${PosteriorRunDir}/Restarts/GEOSChem.Restart.${EndDate_i}_0000z.nc4
     fi
-    python ${InversionPath}/src/components/jacobian_component/make_jacobian_icbc.py $ConfigPath $org_restart ${RunDirs}/jacobian_lowbg_ics_bcs/Restarts $EndDate_i $Species
+    submit_python_stage "${InversionPath}/src/components/jacobian_component/make_jacobian_icbc.py" "$ConfigPath" "$org_restart" "${RunDirs}/jacobian_lowbg_ics_bcs/Restarts" "$EndDate_i" "$Species" || imi_failed "$LINENO" kalman.sh
     rundir_num=$(get_last_rundir_suffix $JacobianRunsDir)
     for ((idx = 0; idx <= rundir_num; idx++)); do
         # Add zeros to string name

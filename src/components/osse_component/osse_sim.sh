@@ -38,7 +38,7 @@ setup_osse() {
     #     -e "s|${EndDate}|${SpinupEnd}|g" geoschem_config.yml
 
     # Turn on StateMetLevEdge output
-    if "$HourlyCH4"; then
+    if "$HourlySpecies"; then
         sed -i -e 's/#'\''StateMetLevEdge/'\''StateMetLevEdge/g' \
             -e 's/StateMetLevEdge.frequency:   00000100 000000/StateMetLevEdge.frequency:   00000000 010000/g' \
             -e 's/StateMetLevEdge.duration:    00000100 000000/StateMetLevEdge.duration:    00000001 000000/g' \
@@ -47,9 +47,9 @@ setup_osse() {
 
     # Create run script from template
     sed -e "s:namename:${OSSEName}:g" \
-        -e "s:##:#:g" ch4_run.template >${OSSEName}.run
+        -e "s:##:#:g" run.template >${OSSEName}.run
     chmod 755 ${OSSEName}.run
-    rm -f ch4_run.template
+    rm -f run.template
 
     ### Perform dry run if requested
     if "$ProductionDryRun"; then
@@ -66,14 +66,14 @@ setup_osse() {
         printf "\nCreating random scaling factors for OSSE run...\n"
         python ${InversionPath}/src/components/osse_component/make_random_sf.py \
         ${RunDirs}/StateVector.nc \
-        ${InversionPath}/${ConfigFile}
+        "$ConfigPath"
     else
         # Copy custom scale factor to $OSSEDirs directory for later use
         printf "\nCopying scale factor file\n"
         cp -v $ScaleFactorFileOSSE ${RunDirs}/osse_observations_run/ScaleFactors.nc
         python ${InversionPath}/src/components/osse_component/make_random_sf.py \
         ${RunDirs}/StateVector.nc \
-        ${InversionPath}/${ConfigFile}
+        "$ConfigPath"
     fi
 
     # Link to restart file
@@ -121,12 +121,9 @@ run_osse() {
     cd ${RunDirs}/osse_observations_run
 
     # Submit job to job scheduler
-    sbatch --mem $RequestedMemory \
-        -c $RequestedCPUs \
-        -t $RequestedTime \
-        -p $SchedulerPartition \
-        -W ${OSSEName}.run
-    wait
+    submit_job "$SchedulerType" false "$RequestedMemory" "$RequestedCPUs" \
+        "$RequestedTime" "$SchedulerPartition" bash "${RunName}_OSSE_Observations.run" \
+        || imi_failed "$LINENO" osse_sim.sh
 
     # check if exited with non-zero exit code
     [ ! -f ".error_status_file.txt" ] || imi_failed $LINENO osse_sim.sh

@@ -27,26 +27,16 @@ run_preview() {
     printf "\n=== RUNNING IMI PREVIEW ===\n"
 
     # Specify inputs for preview script
-    config_path=${InversionPath}/${ConfigFile}
+    config_path=$ConfigPath
     state_vector_path=${RunDirs}/StateVector.nc
     preview_dir=${RunDirs}/${runDir}
     satellite_cache=${RunDirs}/satellite_data
     preview_file=${InversionPath}/src/inversion_scripts/imi_preview.py
 
-    # Run preview script
-    # If running end to end script with sbatch then use
-    # sbatch to take advantage of multiple cores
-    printf "\nCreating preview plots and statistics...\n\n"
-    if [[ $SchedulerType = "slurm" || $SchedulerType = "PBS" ]]; then
-        rm -f .preview_error_status.txt
-        chmod +x $preview_file
-        submit_job $SchedulerType true $RequestedMemory $RequestedCPUs $RequestedTime $SchedulerPartition $preview_file $ConfigPath $state_vector_path $preview_dir $Species $satellite_cache
-
-        # check for any errors
-        [ ! -f ".preview_error_status.txt" ] || imi_failed $LINENO preview.sh
-    else
-        python $preview_file $ConfigPath $state_vector_path $preview_dir $Species $satellite_cache
-    fi
+    rm -f .preview_error_status.txt .error_status_file.txt
+    submit_python_stage "$preview_file" "$ConfigPath" "$state_vector_path" \
+        "$preview_dir" "$Species" "$satellite_cache" || imi_failed "$LINENO" preview.sh
+    [ ! -f .preview_error_status.txt ] || imi_failed "$LINENO" preview.sh
     printf "\n=== DONE RUNNING IMI PREVIEW ===\n"
 
     # check if sbatch commands exited with non-zero exit code
