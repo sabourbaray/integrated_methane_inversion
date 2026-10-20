@@ -158,13 +158,45 @@ def apply_average_tropomi_operator(
             merged["first_gc_edge"],
         )  # ppb
         # Convert ppb to mol m-2
-        sat_CH4_molm2 = sat_CH4 * 1e-9 * dry_air_subcolumns  # mol m-2
+        # Comment out for Bremen data
+        #sat_CH4_molm2 = sat_CH4 * 1e-9 * dry_air_subcolumns  # mol m-2
+        
         # Derive the column-averaged XCH4 that TROPOMI would see over this ground cell
         # using eq. 46 from TROPOMI Methane ATBD, Hasekamp et al. 2019
+        #virtual_tropomi = (
+        #    sum(apriori + avkern * (sat_CH4_molm2 - apriori))
+        #    / sum(dry_air_subcolumns)
+        #    * 1e9
+        #)  # ppb
+        print("---- Debugging Virtual TROPOMI Calculation ----")
+        print("sat_CH4:", sat_CH4)
+        print("sat_CH4 shape:", sat_CH4.shape)
+
+        print("apriori:", apriori)
+        print("apriori shape:", apriori.shape)
+
+        print("avkern:", avkern)
+        print("avkern shape:", avkern.shape)
+
+        print("dry_air_subcolumns:", dry_air_subcolumns)  # If using pressure_weight, print that instead
+        print("dry_air_subcolumns shape:", dry_air_subcolumns.shape)
+
+        # Compute intermediate terms separately
+        diff = sat_CH4 - apriori
+        print("sat_CH4 - apriori:", diff)
+
+        weighted_diff = avkern * diff
+        print("avkern * (sat_CH4 - apriori):", weighted_diff)
+
+        final_term = weighted_diff * dry_air_subcolumns
+        print("(avkern * (sat_CH4 - apriori)) * dry_air_subcolumns:", final_term)
+
+        # Final sum
+        virtual_tropomi = np.sum(apriori + final_term)
+        print("virtual_tropomi:", virtual_tropomi)
+
         virtual_tropomi = (
-            sum(apriori + avkern * (sat_CH4_molm2 - apriori))
-            / sum(dry_air_subcolumns)
-            * 1e9
+            sum(apriori + avkern * (sat_CH4 - apriori) * dry_air_subcolumns)
         )  # ppb
 
         # If building Jacobian matrix from GEOS-Chem perturbation simulation sensitivity data:
@@ -200,11 +232,15 @@ def apply_average_tropomi_operator(
                     np.tile(dry_air_subcolumns, (n_elements, 1))
                 )  # mol m-2
                 # Derive the change in column-averaged XCH4 that TROPOMI would see over this ground cell
+                #xch4[v] = np.sum(
+                #    avkern_tiled * sat_deltaCH4 * dry_air_subcolumns_tiled, 0
+                #) / sum(
+                #    dry_air_subcolumns
+                #)  # mixing ratio, unitless
+                
                 xch4[v] = np.sum(
                     avkern_tiled * sat_deltaCH4 * dry_air_subcolumns_tiled, 0
-                ) / sum(
-                    dry_air_subcolumns
-                )  # mixing ratio, unitless
+                ) # mixing ratio, unitless
             
             # separate variables for convenience later
             pert_jacobian_xch4 = xch4['jacobian_ch4']
@@ -500,14 +536,19 @@ def apply_tropomi_operator(
             )  # ppb
 
             # Convert ppb to mol m-2
-            sat_CH4_molm2 = sat_CH4 * 1e-9 * dry_air_subcolumns  # mol m-2
+            #sat_CH4_molm2 = sat_CH4 * 1e-9 * dry_air_subcolumns  # mol m-2
 
             # Derive the column-averaged XCH4 that TROPOMI would see over this ground cell
             # using eq. 46 from TROPOMI Methane ATBD, Hasekamp et al. 2019
+            #virtual_tropomi_gridcellIndex = (
+            #    sum(apriori + avkern * (sat_CH4_molm2 - apriori))
+            #    / sum(dry_air_subcolumns)
+            #    * 1e9
+            #)  # ppb
+            
+
             virtual_tropomi_gridcellIndex = (
-                sum(apriori + avkern * (sat_CH4_molm2 - apriori))
-                / sum(dry_air_subcolumns)
-                * 1e9
+                sum(apriori + avkern * (sat_CH4 - apriori) * dry_air_subcolumns)
             )  # ppb
 
             # Weight by overlapping area (to be divided out later) and add to sum
@@ -539,11 +580,15 @@ def apply_tropomi_operator(
                 )  # mol m-2
 
                 # Derive the change in column-averaged XCH4 that TROPOMI would see over this ground cell
+                #tropomi_sensitivity_gridcellIndex = np.sum(
+                #    avkern_tiled * sat_deltaCH4 * dry_air_subcolumns_tiled, 0
+                #) / sum(
+                #    dry_air_subcolumns
+                #)  # mixing ratio, unitless
+
                 tropomi_sensitivity_gridcellIndex = np.sum(
                     avkern_tiled * sat_deltaCH4 * dry_air_subcolumns_tiled, 0
-                ) / sum(
-                    dry_air_subcolumns
-                )  # mixing ratio, unitless
+                ) # mixing ratio, unitless
 
                 # Weight by overlapping area (to be divided out later) and add to sum
                 area_weighted_virtual_tropomi_sensitivity += (
@@ -786,6 +831,7 @@ def read_bremen(filename):
             dat["methane_profile_apriori"] = wfmd_data["ch4_profile_apriori"].values[:, :] # ppb
             dat["longitude_bounds"] = wfmd_data['longitude_corners'].values[:]
             dat["latitude_bounds"] = wfmd_data['latitude_corners'].values[:]
+            dat["dry_air_subcolumns"] = wfmd_data["pressure_weight"].values[:, ::-1]
             
             # Get midpoint of pressure levels to get 20 layers
             pressure = wfmd_data["pressure_levels"].values[:, :] # hPa

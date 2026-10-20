@@ -399,7 +399,8 @@ def remap(gc_CH4, data_type, p_merge, edge_index, first_gc_edge):
 
     # Calculate the pressure-weighted mean methane for each TROPOMI layer
     delta_p = p_merge[:-1] - p_merge[1:]
-    sat_CH4 = np.zeros(lev - 1)
+    #sat_CH4 = np.zeros(lev - 1)
+    sat_CH4 = np.zeros(lev)
     sat_CH4.fill(np.nan)
     for i in range(len(edge_index) - 1):
         start = edge_index[i]
@@ -450,7 +451,8 @@ def remap_sensitivities(sensi_lonlat, data_type, p_merge, edge_index, first_gc_e
     # Calculate the weighted mean DeltaCH4 for each layer, for all perturbed state vector elements
     delta_p = p_merge[:-1] - p_merge[1:]
     delta_ps = np.transpose(np.tile(delta_p, (n_elem, 1)))
-    sat_deltaCH4 = np.zeros((lev - 1, n_elem))
+    #sat_deltaCH4 = np.zeros((lev - 1, n_elem))
+    sat_deltaCH4 = np.zeros((lev, n_elem))
     sat_deltaCH4.fill(np.nan)
     for i in range(len(edge_index) - 1):
         start = edge_index[i]
