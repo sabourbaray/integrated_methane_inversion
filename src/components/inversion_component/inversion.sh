@@ -41,7 +41,10 @@ setup_inversion() {
 
     # Replace config file path in viz notebook
     copied_config=${RunDirs}/config_${RunName}.yml
-    sed -i 's|\/home\/ubuntu\/integrated_methane_inversion\/config.yml|'$copied_config'|g' inversion/visualization_notebook.ipynb
+    sed -i \
+    -e "s|/home/ubuntu/integrated_methane_inversion/config.yml|${copied_config}|g" \
+    -e "s|{INVERSION_PATH}|${InversionPath}|g" \
+    inversion/visualization_notebook.ipynb
 
     # Fix path to classify_TROPOMI_obs_to_CSgrids.py in local utils.py
     sed -i -e "s:src.inversion_scripts.classify:classify:g" inversion/utils.py
