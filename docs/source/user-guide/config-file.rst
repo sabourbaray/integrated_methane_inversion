@@ -373,7 +373,12 @@ variables can be convenient.
 Scheduler logs are stored under ``<OutputPath>/<RunName>/scheduler/<component>``
 with sequential job numbers. Each submission retains its wrapper, submission
 log, task logs, and a combined exit-status table. Model restart archives remain
-in each simulation's ``.imi_cycles`` directory. Cycling progress is printed
+in each simulation's ``.imi_cycles`` directory.
+After a Jacobian or posterior simulation completes successfully, its generated
+restart files are removed from ``Restarts`` and ``.imi_cycles`` (including
+archived copies). Initial-condition symlinks, diagnostics, logs, and cycling
+state are retained. Incomplete simulations retain their restarts.
+Cycling progress is printed
 every 600 seconds and after each submission, and appended to ``imi_output.log``.
 An unexpected scheduler failure or missing completion record stops the workflow;
 reconcile the old jobs before retrying. Do not run two controllers on the same

@@ -309,6 +309,22 @@ def worker(manifest):
             raise
 
 
+def cleanup_restarts(run):
+    removed = 0
+    for directory in (run / "Restarts", run / ".imi_cycles"):
+        if directory.is_symlink():
+            continue
+        for root, _, files in os.walk(directory, followlinks=False):
+            for name in files:
+                if not re.fullmatch(r"GEOSChem\.Restart\.\d{8}_\d{4}z\.nc4", name):
+                    continue
+                path = Path(root) / name
+                if not path.is_symlink():
+                    path.unlink()
+                    removed += 1
+    return removed
+
+
 def summary(runs, stage, log):
     states = [read_json(run / ".imi_cycles/state.json") for run in runs]
     count = lambda status: sum(s["status"] == status for s in states)
@@ -356,6 +372,15 @@ def controller(config_path, root, stage, range_, directory):
             stream.write(header + "\n")
         while True:
             states = summary(runs, stage, log)
+            if stage in ("jacobian", "posterior"):
+                for run, state in zip(runs, states):
+                    if state["status"] == "complete":
+                        removed = cleanup_restarts(run)
+                        if removed:
+                            message = f"{run.name}: removed {removed} completed simulation restart files"
+                            print(message, flush=True)
+                            with log.open("a") as stream:
+                                stream.write(message + "\n")
             pending = [str(run) for run, state in zip(runs, states) if state["status"] != "complete"]
             if not pending:
                 return
